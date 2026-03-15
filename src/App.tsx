@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import rawToolingDatabase from "@/data/tooling.yaml?raw"
+import rawToolingDatabase from "@/data/projects.yaml?raw"
 import { loadToolingRows, type ToolRow } from "@/lib/tooling"
 
 const toolingRows = loadToolingRows(rawToolingDatabase)
@@ -104,7 +104,7 @@ export function App() {
               </div>
             </div>
             <div className="flex items-end gap-4">
-              <div className="min-w-0 max-w-2xl flex-1">
+              <div className="max-w-2xl min-w-0 flex-1">
                 <div className="relative">
                   <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-background/85 px-3 py-2 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10">
                     <Search className="size-4 text-muted-foreground" />
@@ -276,7 +276,7 @@ export function App() {
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell className="text-right text-muted-foreground tabular-nums">
                     {formatStarCount(tool.stars)}
                   </TableCell>
                   <TableCell>

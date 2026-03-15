@@ -47,7 +47,7 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet -- src/data/tooling.yaml; then
+          if git diff --quiet -- src/data/projects.yaml; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
@@ -58,6 +58,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/tooling.yaml
+          git add src/data/projects.yaml
           git commit -m "chore: refresh GitHub metadata"
           git push origin HEAD:main

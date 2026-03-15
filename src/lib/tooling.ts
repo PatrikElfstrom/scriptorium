@@ -26,7 +26,7 @@ export function loadToolingRows(source: string) {
   const document = parse(source) as ToolingDatabase
 
   if (!Array.isArray(document.projects)) {
-    throw new Error("tooling.yaml must include a projects array.")
+    throw new Error("projects.yaml must include a projects array.")
   }
 
   const entries = readObjectArray(document.projects, "projects")
@@ -69,7 +69,7 @@ function readOptionalString(value: unknown) {
   }
 
   if (typeof value !== "string") {
-    throw new Error("Expected a string value in tooling.yaml.")
+    throw new Error("Expected a string value in projects.yaml.")
   }
 
   const trimmed = value.trim()

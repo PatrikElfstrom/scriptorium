@@ -3,7 +3,7 @@ import { parseDocument, isMap, isScalar, isSeq } from "yaml"
 
 const toolingPath = process.env.TOOLING_PATH
   ? new URL(process.env.TOOLING_PATH, `file://${process.cwd()}/`)
-  : new URL("../src/data/tooling.yaml", import.meta.url)
+  : new URL("../src/data/projects.yaml", import.meta.url)
 const githubToken = process.env.GITHUB_TOKEN
 const githubApiBaseUrl =
   process.env.GITHUB_API_BASE_URL ?? "https://api.github.com"
@@ -13,14 +13,14 @@ const document = parseDocument(source)
 const projectsNode = document.get("projects", true)
 
 if (!isSeq(projectsNode)) {
-  throw new Error("tooling.yaml must include a projects array.")
+  throw new Error("projects.yaml must include a projects array.")
 }
 
 const repositoryNames = []
 
 for (const projectNode of projectsNode.items) {
   if (!isMap(projectNode)) {
-    throw new Error("Each project entry in tooling.yaml must be an object.")
+    throw new Error("Each project entry in projects.yaml must be an object.")
   }
 
   const repositoryName = readOptionalString(projectNode.get("repository_name"))
@@ -31,7 +31,9 @@ for (const projectNode of projectsNode.items) {
 }
 
 const uniqueRepositoryNames = Array.from(new Set(repositoryNames))
-const metadataByRepository = await fetchRepositoryMetadata(uniqueRepositoryNames)
+const metadataByRepository = await fetchRepositoryMetadata(
+  uniqueRepositoryNames
+)
 
 let updatedProjectCount = 0
 
@@ -58,7 +60,7 @@ for (const projectNode of projectsNode.items) {
 
   if (shouldSyncTagsFromGitHub(projectNode)) {
     const nextTopics = metadata.topics.toSorted((left, right) =>
-      left.localeCompare(right),
+      left.localeCompare(right)
     )
     const currentTags = readStringArray(projectNode.get("tags"))
 
@@ -83,7 +85,7 @@ if (nextSource === source) {
 await writeFile(toolingPath, nextSource)
 
 console.log(
-  `Updated ${updatedProjectCount} project entries across ${uniqueRepositoryNames.length} repositories.`,
+  `Updated ${updatedProjectCount} project entries across ${uniqueRepositoryNames.length} repositories.`
 )
 
 function readOptionalString(value) {
@@ -147,7 +149,7 @@ async function fetchRepositoryMetadata(repositoryNames) {
       batch.map(async (repositoryName) => [
         repositoryName,
         await fetchSingleRepositoryMetadata(repositoryName),
-      ]),
+      ])
     )
 
     for (const [repositoryName, metadata] of entries) {
@@ -175,7 +177,7 @@ async function fetchSingleRepositoryMetadata(repositoryName) {
     const details = await response.text()
 
     throw new Error(
-      `Failed to fetch ${repositoryName}: ${response.status} ${response.statusText}\n${details}`,
+      `Failed to fetch ${repositoryName}: ${response.status} ${response.statusText}\n${details}`
     )
   }
 
