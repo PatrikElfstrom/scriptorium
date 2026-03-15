@@ -213,7 +213,6 @@ projects:
     repository_name: remix-run/remix
     stars: 32478
     tags:
-      - nodejs-framework
       - react
       - fullstack
       - remix
@@ -302,16 +301,18 @@ projects:
       - vite
     url: http://vite.dev
   - name: vite+
+    repository_name: voidzero-dev/vite-plus
     tags:
       - manager
-      - vite
+      - monorepo
+      - node-version-manager
+      - scaffolding
     url: https://viteplus.dev
-  - name: Vite + RSC plugin
+  - name: void
     tags:
       - experimental
       - fullstack-framework
       - react
-    url: https://vite.dev/plugins/#vitejs-plugin-rsc
   - name: VitePress
     repository_name: vuejs/vitepress
     stars: 17298
@@ -338,6 +339,7 @@ projects:
     url: https://webpack.js.org
     stars: 66015
   - name: yarn
+    repository_name: yarnpkg/berry
     tags:
       - package-manager
     url: https://yarnpkg.com
@@ -1116,7 +1118,7 @@ projects:
     tags:
       - framework
       - reactive
-      - solid
+      - solidjs
     url: https://solidjs.com
   - name: Stagehand
     repository_name: browserbase/stagehand
@@ -1212,7 +1214,7 @@ projects:
       - graphql
       - caching
       - svelte
-      - solid
+      - solidjs
     url: https://tanstack.com/query
   - name: TanStack Router/TanStack Start
     repository_name: TanStack/router
@@ -1223,7 +1225,7 @@ projects:
       - routing
       - vue
       - svelte
-      - solid
+      - solidjs
       - fullstack
     url: https://tanstack.com/router
   - name: Tauri
@@ -1258,7 +1260,7 @@ projects:
       - react
       - rich-text-editor
       - vue
-      - solid
+      - solidjs
     url: https://tiptap.dev
   - name: Transformers.js
     repository_name: huggingface/transformers.js
@@ -1432,7 +1434,7 @@ projects:
       - state
       - state-machine
       - svelte
-      - solid
+      - solidjs
     url: https://stately.ai/docs
   - name: yaak
     repository_name: mountain-loop/yaak
@@ -1456,3 +1458,33 @@ projects:
       - react
       - state
     url: https://zustand-demo.pmnd.rs
+  - name: husky
+    repository_name: typicode/husky
+    stars: 34868
+    tags:
+      - git-hook
+    url: https://typicode.github.io/husky/
+  - name: lefthook
+    repository_name: evilmartians/lefthook
+    url: http://lefthook.dev/
+    stars: 7760
+    tags:
+      - git-hook
+  - name: sveltkit
+    repository_name: sveltejs/kit
+    stars: 20352
+    tags:
+      - fullstack-framework
+      - meta-framework
+      - svelte
+    url: https://svelte.dev/docs/kit/introduction
+  - name: SolidStart
+    repository_name: solidjs/solid-start
+    stars: 5821
+    tags:
+      - fullstack-framework
+      - meta-framework
+      - solidjs
+      - server-side-rendering
+      - single-page-application
+    url: https://www.solidjs.com/start
