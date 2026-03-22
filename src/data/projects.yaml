@@ -1,7 +1,7 @@
 projects:
   - name: Astro
     repository_name: withastro/astro
-    stars: 57723
+    stars: 57740
     tags:
       - static-site-generator
       - fullstack
@@ -9,7 +9,7 @@ projects:
     url: https://astro.build
   - name: Base UI
     repository_name: mui/base-ui
-    stars: 8993
+    stars: 9002
     tags:
       - react
       - component-library
@@ -17,7 +17,7 @@ projects:
     url: https://base-ui.com
   - name: Biome
     repository_name: biomejs/biome
-    stars: 24119
+    stars: 24162
     tags:
       - linter
       - rust
@@ -25,7 +25,7 @@ projects:
     url: https://biomejs.dev
   - name: Bun
     repository_name: oven-sh/bun
-    stars: 88295
+    stars: 88338
     tags:
       - build-tool
       - runtime
@@ -36,10 +36,10 @@ projects:
     tags:
       - javascript-runtime
     url: https://deno.com
-    stars: 106419
+    stars: 106447
   - name: Docusaurus
     repository_name: facebook/docusaurus
-    stars: 64209
+    stars: 64223
     tags:
       - static-site-generator
       - react
@@ -51,13 +51,13 @@ projects:
       - build-tool
       - bundler
     url: https://esbuild.github.io
-    stars: 39833
+    stars: 39853
   - name: eslint
     repository_name: eslint/eslint
     tags:
       - linter
     url: https://eslint.org
-    stars: 27210
+    stars: 27224
   - name: Farm
     repository_name: farm-fe/farm
     tags:
@@ -72,10 +72,10 @@ projects:
       - deno
       - fullstack-framework
     url: https://fresh.deno.dev
-    stars: 13765
+    stars: 13771
   - name: Fumadocs
     repository_name: fuma-nama/fumadocs
-    stars: 11241
+    stars: 11257
     tags:
       - static-site-generator
       - documentation
@@ -87,10 +87,10 @@ projects:
       - testing-framework
       - unit-test
     url: https://jestjs.io
-    stars: 45326
+    stars: 45328
   - name: Material UI
     repository_name: mui/material-ui
-    stars: 98043
+    stars: 98060
     tags:
       - react
       - material-design
@@ -99,7 +99,7 @@ projects:
     url: https://mui.com/material-ui
   - name: Next.js
     repository_name: vercel/next.js
-    stars: 138405
+    stars: 138431
     tags:
       - static-site-generator
       - react
@@ -111,7 +111,7 @@ projects:
     url: https://nextjs.org
   - name: Nx
     repository_name: nrwl/nx
-    stars: 28371
+    stars: 28376
     tags:
       - angular
       - react
@@ -125,16 +125,16 @@ projects:
       - javascript-runtime
       - runtime
     url: https://nodejs.org
-    stars: 116360
+    stars: 116385
   - name: npm
     repository_name: npm/cli
     tags:
       - package-manager
     url: https://www.npmjs.com
-    stars: 9617
+    stars: 9623
   - name: Nuxt
     repository_name: nuxt/nuxt
-    stars: 59903
+    stars: 59924
     tags:
       - nodejs-framework
       - static-site-generator
@@ -144,21 +144,21 @@ projects:
     url: https://nuxt.com
   - name: oxc-parser
     repository_name: oxc-project/oxc
-    stars: 20200
+    stars: 20226
     tags:
       - parser
       - rust
     url: https://oxc.rs
   - name: Oxfmt
     repository_name: oxc-project/oxc
-    stars: 20200
+    stars: 20226
     tags:
       - formatter
       - rust
     url: https://oxc.rs
   - name: Oxlint
     repository_name: oxc-project/oxc
-    stars: 20200
+    stars: 20226
     tags:
       - linter
       - rust
@@ -169,10 +169,10 @@ projects:
       - build-tool
       - bundler
     url: https://parceljs.org
-    stars: 44047
+    stars: 44049
   - name: Playwright
     repository_name: microsoft/playwright
-    stars: 84650
+    stars: 84694
     tags:
       - test
       - automation
@@ -182,10 +182,10 @@ projects:
     tags:
       - package-manager
     url: https://pnpm.io
-    stars: 34372
+    stars: 34383
   - name: Puppeteer
     repository_name: puppeteer/puppeteer
-    stars: 93886
+    stars: 93892
     tags:
       - automation
     url: https://pptr.dev
@@ -194,14 +194,14 @@ projects:
     tags:
       - formatter
     url: https://prettier.io
-    stars: 51770
+    stars: 51790
   - name: Radix UI
     repository_name: radix-ui/primitives
     tags:
       - component-library
       - unstyled-components
     url: https://www.radix-ui.com
-    stars: 18713
+    stars: 18740
   - name: Radix UI Playground
     repository_name: radix-ui/themes
     tags:
@@ -211,7 +211,7 @@ projects:
     stars: 8242
   - name: Remix
     repository_name: remix-run/remix
-    stars: 32522
+    stars: 32530
     tags:
       - react
       - fullstack
@@ -219,7 +219,7 @@ projects:
     url: https://remix.run
   - name: Rolldown
     repository_name: rolldown/rolldown
-    stars: 13170
+    stars: 13178
     tags:
       - build-tool
       - module
@@ -228,7 +228,7 @@ projects:
     url: https://rolldown.rs
   - name: Rspack
     repository_name: web-infra-dev/rspack
-    stars: 12573
+    stars: 12577
     tags:
       - build-tool
       - rust
@@ -245,7 +245,7 @@ projects:
     tags:
       - static-site-generator
     url: https://rspress.rs
-    stars: 2179
+    stars: 2180
   - name: rstest
     tags:
       - rust
@@ -253,7 +253,7 @@ projects:
     url: https://rstest.rs
   - name: shadcn/ui
     repository_name: shadcn-ui/ui
-    stars: 110214
+    stars: 110341
     tags:
       - react
       - component-library
@@ -263,7 +263,7 @@ projects:
     url: https://ui.shadcn.com
   - name: shadcn/ui create
     repository_name: shadcn-ui/ui
-    stars: 110214
+    stars: 110341
     tags:
       - component-library
       - scaffolder
@@ -275,14 +275,14 @@ projects:
       - static-site-generator
       - svelte
     url: https://svelte.dev/docs/kit
-    stars: 20371
+    stars: 20368
   - name: swc
     repository_name: swc-project/swc
     tags:
       - parser
       - rust
     url: https://swc.rs
-    stars: 33314
+    stars: 33316
   - name: TanStack Builder
     tags:
       - fullstack-framework
@@ -295,7 +295,7 @@ projects:
     url: https://tanstack.com/start
   - name: Vite
     repository_name: vitejs/vite
-    stars: 79250
+    stars: 79292
     tags:
       - build-tool
       - vite
@@ -308,7 +308,7 @@ projects:
       - node-version-manager
       - scaffolding
     url: https://viteplus.dev
-    stars: 3115
+    stars: 3187
   - name: void
     tags:
       - experimental
@@ -316,7 +316,7 @@ projects:
       - react
   - name: VitePress
     repository_name: vuejs/vitepress
-    stars: 17355
+    stars: 17361
     tags:
       - static-site-generator
       - vue
@@ -324,7 +324,7 @@ projects:
     url: https://vitepress.dev
   - name: Vitest
     repository_name: vitest-dev/vitest
-    stars: 16203
+    stars: 16205
     tags:
       - test
       - react
@@ -338,22 +338,22 @@ projects:
       - build-tool
       - bundler
     url: https://webpack.js.org
-    stars: 66023
+    stars: 66033
   - name: yarn
     repository_name: yarnpkg/berry
     tags:
       - package-manager
     url: https://yarnpkg.com
-    stars: 8083
+    stars: 8098
   - name: Adonis
     repository_name: adonisjs/core
-    stars: 18807
+    stars: 18810
     tags:
       - nodejs-framework
     url: https://adonisjs.com
   - name: AFFiNE
     repository_name: toeverything/AFFiNE
-    stars: 66350
+    stars: 66420
     tags:
       - realtime
       - drawing
@@ -362,7 +362,7 @@ projects:
     url: https://affine.pro
   - name: AI Chatbot
     repository_name: vercel/ai-chatbot
-    stars: 19931
+    stars: 19939
     tags:
       - boilerplate
       - bot
@@ -385,20 +385,20 @@ projects:
     url: https://alpinejs.dev
   - name: Angular
     repository_name: angular/angular
-    stars: 100119
+    stars: 100150
     tags:
       - angular
       - framework
     url: https://angular.dev
   - name: Anime.js
     repository_name: juliangarnier/anime
-    stars: 66907
+    stars: 66915
     tags:
       - animation
     url: https://animejs.com
   - name: Ant Design
     repository_name: ant-design/ant-design
-    stars: 97747
+    stars: 97768
     tags:
       - react
       - component-library
@@ -406,7 +406,7 @@ projects:
     url: https://ant.design
   - name: Ant Design X
     repository_name: ant-design/x
-    stars: 4394
+    stars: 4396
     tags:
       - react
       - component-library
@@ -414,27 +414,27 @@ projects:
     url: https://x.ant.design
   - name: Basecoat
     repository_name: hunvreus/basecoat
-    stars: 3783
+    stars: 3784
     tags:
       - component-library
       - shadcn
     url: https://basecoatui.com
   - name: BeerCSS
     repository_name: beercss/beercss
-    stars: 2261
+    stars: 2260
     tags:
       - css-library
       - material-design
     url: https://www.beercss.com
   - name: BentoPDF
     repository_name: alam00000/bentopdf
-    stars: 12206
+    stars: 12225
     tags:
       - pdf
     url: https://bentopdf.com
   - name: Better Auth
     repository_name: better-auth/better-auth
-    stars: 27322
+    stars: 27330
     tags:
       - auth
     url: https://better-auth.com
@@ -446,21 +446,21 @@ projects:
     url: https://boardgame.io
   - name: bolt.new
     repository_name: stackblitz/bolt.new
-    stars: 16258
+    stars: 16257
     tags:
       - ai
       - ai-builder
     url: https://bolt.new
   - name: Bootstrap
     repository_name: twbs/bootstrap
-    stars: 174099
+    stars: 174100
     tags:
       - css-library
       - bootstrap
     url: https://getbootstrap.com
   - name: Botpress
     repository_name: botpress/botpress
-    stars: 14614
+    stars: 14616
     tags:
       - bot
       - ai
@@ -468,20 +468,20 @@ projects:
     url: https://botpress.com
   - name: Bruno
     repository_name: usebruno/bruno
-    stars: 42027
+    stars: 42043
     tags:
       - http
       - desktop-app
     url: https://www.usebruno.com
   - name: Capacitor
     repository_name: ionic-team/capacitor
-    stars: 15298
+    stars: 15302
     tags:
       - mobile
     url: https://capacitorjs.com
   - name: create-t3-app
     repository_name: t3-oss/create-t3-app
-    stars: 28678
+    stars: 28682
     tags:
       - react
       - boilerplate
@@ -499,14 +499,14 @@ projects:
     url: https://cypress.io
   - name: DaisyUI
     repository_name: saadeghi/daisyui
-    stars: 40562
+    stars: 40566
     tags:
       - css-library
       - tailwind
     url: https://daisyui.com
   - name: Dioxus
     repository_name: DioxusLabs/dioxus
-    stars: 35385
+    stars: 35393
     tags:
       - mobile
       - desktop
@@ -515,7 +515,7 @@ projects:
     url: https://dioxuslabs.com
   - name: Directus
     repository_name: directus/directus
-    stars: 34528
+    stars: 34538
     tags:
       - nodejs-framework
       - content-management-system
@@ -528,47 +528,47 @@ projects:
     url: https://directus.io
   - name: Docmost
     repository_name: docmost/docmost
-    stars: 19502
+    stars: 19515
     tags:
       - documentation
       - self-hosted
     url: https://docmost.com
   - name: Dyad
     repository_name: dyad-sh/dyad
-    stars: 19926
+    stars: 19932
     tags:
       - ai
       - ai-builder
     url: https://dyad.sh
   - name: Electron
     repository_name: electron/electron
-    stars: 120567
+    stars: 120582
     tags:
       - desktop
     url: https://electronjs.org
   - name: electron-vite
     repository_name: alex8088/electron-vite
-    stars: 5286
+    stars: 5287
     tags:
       - desktop
       - vite
     url: https://electron-vite.org
   - name: Element Plus
     repository_name: element-plus/element-plus
-    stars: 27244
+    stars: 27248
     tags:
       - vue
       - component-library
     url: https://element-plus.org
   - name: Eleventy
     repository_name: 11ty/eleventy
-    stars: 19514
+    stars: 19518
     tags:
       - static-site-generator
     url: https://www.11ty.dev
   - name: Elysia
     repository_name: elysiajs/elysia
-    stars: 17684
+    stars: 17693
     tags:
       - nodejs-framework
       - websocket
@@ -576,7 +576,7 @@ projects:
     url: https://elysiajs.com
   - name: EverShop
     repository_name: evershopcommerce/evershop
-    stars: 9915
+    stars: 9919
     tags:
       - react
       - graphql
@@ -584,7 +584,7 @@ projects:
     url: https://evershop.io
   - name: Excalidraw
     repository_name: excalidraw/excalidraw
-    stars: 119225
+    stars: 119296
     tags:
       - react
       - drawing
@@ -592,33 +592,33 @@ projects:
     url: https://excalidraw.com
   - name: Expo
     repository_name: expo/expo
-    stars: 48106
+    stars: 48124
     tags:
       - mobile
       - react-native
     url: https://docs.expo.dev
   - name: Express
     repository_name: expressjs/express
-    stars: 68900
+    stars: 68918
     tags:
       - nodejs-framework
       - express
     url: https://expressjs.com
   - name: Fastify
     repository_name: fastify/fastify
-    stars: 35873
+    stars: 35881
     tags:
       - nodejs-framework
     url: https://www.fastify.dev
   - name: FlowGram.ai
     repository_name: bytedance/flowgram.ai
-    stars: 7799
+    stars: 7808
     tags:
       - diagram
     url: https://flowgram.ai
   - name: Flowise
     repository_name: FlowiseAI/Flowise
-    stars: 50932
+    stars: 50955
     tags:
       - lowcode
       - ai
@@ -626,7 +626,7 @@ projects:
     url: https://flowiseai.com
   - name: Gatsby
     repository_name: gatsbyjs/gatsby
-    stars: 55945
+    stars: 55951
     tags:
       - static-site-generator
       - react
@@ -635,7 +635,7 @@ projects:
     url: https://www.gatsbyjs.com
   - name: gluestack-ui
     repository_name: gluestack/gluestack-ui
-    stars: 4985
+    stars: 4986
     tags:
       - accessibility
       - react-native
@@ -644,18 +644,18 @@ projects:
     url: https://gluestack.io
   - name: GraphiQL
     repository_name: graphql/graphiql
-    stars: 16817
+    stars: 16816
     tags:
       - graphql
   - name: Hasura GraphQL Engine
     repository_name: hasura/graphql-engine
-    stars: 31919
+    stars: 31924
     tags:
       - graphql
     url: https://hasura.io
   - name: HeroUI
     repository_name: heroui-inc/heroui
-    stars: 28446
+    stars: 28509
     tags:
       - react
       - component-library
@@ -663,7 +663,7 @@ projects:
     url: https://heroui.com
   - name: Hono
     repository_name: honojs/hono
-    stars: 29469
+    stars: 29482
     tags:
       - nodejs-framework
       - deno
@@ -671,14 +671,14 @@ projects:
     url: https://hono.dev
   - name: htmx
     repository_name: bigskysoftware/htmx
-    stars: 47672
+    stars: 47674
     tags:
       - framework
       - html-tagging
     url: https://htmx.org
   - name: Ink
     repository_name: vadimdemedes/ink
-    stars: 35686
+    stars: 35703
     tags:
       - react
       - cli
@@ -692,7 +692,7 @@ projects:
     url: https://jotai.org
   - name: JSON Crack
     repository_name: AykutSarac/jsoncrack.com
-    stars: 43748
+    stars: 43758
     tags:
       - json
       - developer-tool
@@ -700,7 +700,7 @@ projects:
     url: https://jsoncrack.com
   - name: LangChain.js
     repository_name: langchain-ai/langchainjs
-    stars: 17279
+    stars: 17287
     tags:
       - ai
       - ai-agents
@@ -715,14 +715,14 @@ projects:
     url: https://leptos.dev
   - name: Lit
     repository_name: lit/lit
-    stars: 21343
+    stars: 21353
     tags:
       - framework
       - webcomponent
     url: https://lit.dev
   - name: LiveStore
     repository_name: livestorejs/livestore
-    stars: 3501
+    stars: 3505
     tags:
       - realtime
       - database
@@ -730,7 +730,7 @@ projects:
     url: https://livestore.dev
   - name: Lucide
     repository_name: lucide-icons/lucide
-    stars: 21636
+    stars: 21651
     tags:
       - icon
     url: https://lucide.dev
@@ -742,7 +742,7 @@ projects:
     url: https://lynxjs.org
   - name: Magic UI
     repository_name: magicuidesign/magicui
-    stars: 20481
+    stars: 20489
     tags:
       - react
       - component-library
@@ -750,21 +750,21 @@ projects:
     url: https://magicui.design
   - name: Mastra
     repository_name: mastra-ai/mastra
-    stars: 22177
+    stars: 22207
     tags:
       - ai
       - ai-agents
     url: https://mastra.ai
   - name: MCP-SDK
     repository_name: modelcontextprotocol/typescript-sdk
-    stars: 11906
+    stars: 11915
     tags:
       - ai
       - model-context-protocol
     url: https://modelcontextprotocol.io
   - name: Mermaid
     repository_name: mermaid-js/mermaid
-    stars: 86818
+    stars: 86858
     tags:
       - chart
       - d3
@@ -772,21 +772,21 @@ projects:
     url: https://mermaid.js.org
   - name: Midscene.js
     repository_name: web-infra-dev/midscene
-    stars: 12271
+    stars: 12275
     tags:
       - automation
       - ai
     url: https://midscenejs.com
   - name: Mock Service Worker
     repository_name: mswjs/msw
-    stars: 17751
+    stars: 17752
     tags:
       - test
       - serviceworker
     url: https://mswjs.io
   - name: Motia
     repository_name: MotiaDev/motia
-    stars: 15232
+    stars: 15233
     tags:
       - nodejs-framework
       - workflow
@@ -795,7 +795,7 @@ projects:
     url: https://motia.dev
   - name: n8n
     repository_name: n8n-io/n8n
-    stars: 180228
+    stars: 180394
     tags:
       - workflow
       - ai
@@ -808,7 +808,7 @@ projects:
       - state
   - name: NativeWind
     repository_name: nativewind/nativewind
-    stars: 7708
+    stars: 7709
     tags:
       - css-in-js
       - react-native
@@ -817,14 +817,14 @@ projects:
     url: https://nativewind.dev
   - name: Nest
     repository_name: nestjs/nest
-    stars: 74973
+    stars: 74992
     tags:
       - nodejs-framework
       - microservice
     url: https://nestjs.com
   - name: next-saas-starter
     repository_name: nextjs/saas-starter
-    stars: 15529
+    stars: 15530
     tags:
       - boilerplate
       - nextjs
@@ -832,7 +832,7 @@ projects:
     url: https://next-saas-start.vercel.app
   - name: Nextra
     repository_name: shuding/nextra
-    stars: 13696
+    stars: 13694
     tags:
       - static-site-generator
       - documentation
@@ -840,7 +840,7 @@ projects:
     url: https://nextra.site
   - name: Nhost
     repository_name: nhost/nhost
-    stars: 9110
+    stars: 9111
     tags:
       - realtime
       - auth
@@ -859,7 +859,7 @@ projects:
     url: https://v3.nitro.build
   - name: NocoDB
     repository_name: nocodb/nocodb
-    stars: 62503
+    stars: 62530
     tags:
       - content-management-system
       - spreadsheet
@@ -874,7 +874,7 @@ projects:
     url: https://nuejs.org
   - name: Nuxt UI
     repository_name: nuxt/ui
-    stars: 6384
+    stars: 6389
     tags:
       - vue
       - component-library
@@ -882,12 +882,12 @@ projects:
     url: https://ui.nuxt.com
   - name: nvm
     repository_name: nvm-sh/nvm
-    stars: 92427
+    stars: 92445
     tags:
       - node-version-manager
   - name: Onlook
     repository_name: onlook-dev/onlook
-    stars: 24930
+    stars: 24936
     tags:
       - react
       - offline
@@ -896,21 +896,21 @@ projects:
     url: https://onlook.com
   - name: OpenAI Node API
     repository_name: openai/openai-node
-    stars: 10748
+    stars: 10753
     tags:
       - sdk
       - ai
     url: https://www.npmjs.com/package/openai
   - name: Outline
     repository_name: outline/outline
-    stars: 37739
+    stars: 37750
     tags:
       - documentation
       - self-hosted
     url: https://www.getoutline.com
   - name: Payload
     repository_name: payloadcms/payload
-    stars: 41348
+    stars: 41360
     tags:
       - nodejs-framework
       - react
@@ -920,34 +920,34 @@ projects:
     url: https://payloadcms.com
   - name: Pico.css
     repository_name: picocss/pico
-    stars: 16471
+    stars: 16469
     tags:
       - css-library
     url: https://picocss.com
   - name: Pinia
     repository_name: vuejs/pinia
-    stars: 14523
+    stars: 14524
     tags:
       - vue
       - state
     url: https://pinia.vuejs.org
   - name: Preact
     repository_name: preactjs/preact
-    stars: 38493
+    stars: 38495
     tags:
       - framework
       - vdom
     url: https://preactjs.com
   - name: PrimeVue
     repository_name: primefaces/primevue
-    stars: 14166
+    stars: 14170
     tags:
       - vue
       - component-library
     url: https://primevue.org
   - name: Puck
     repository_name: puckeditor/puck
-    stars: 12377
+    stars: 12382
     tags:
       - react
       - rich-text-editor
@@ -956,13 +956,13 @@ projects:
     url: https://puckeditor.com
   - name: Quartz
     repository_name: jackyzha0/quartz
-    stars: 11541
+    stars: 11558
     tags:
       - static-site-generator
     url: https://quartz.jzhao.xyz
   - name: Quasar
     repository_name: quasarframework/quasar
-    stars: 27118
+    stars: 27117
     tags:
       - framework
       - mobile
@@ -973,7 +973,7 @@ projects:
     url: https://quasar.dev
   - name: Radix Vue
     repository_name: unovue/reka-ui
-    stars: 6306
+    stars: 6309
     tags:
       - accessibility
       - vue
@@ -982,7 +982,7 @@ projects:
     url: https://reka-ui.com
   - name: React
     repository_name: facebook/react
-    stars: 244092
+    stars: 244125
     tags:
       - framework
       - react
@@ -990,14 +990,14 @@ projects:
     url: https://react.dev
   - name: React Bits
     repository_name: DavidHDev/react-bits
-    stars: 36988
+    stars: 37014
     tags:
       - animation
       - react
     url: https://reactbits.dev
   - name: React Flow/Svelte Flow
     repository_name: xyflow/xyflow
-    stars: 35730
+    stars: 35780
     tags:
       - react
       - diagram
@@ -1006,14 +1006,14 @@ projects:
     url: https://reactflow.dev
   - name: React Native
     repository_name: facebook/react-native
-    stars: 125617
+    stars: 125620
     tags:
       - mobile
       - react-native
     url: https://reactnative.dev
   - name: React Native Reusables
     repository_name: founded-labs/react-native-reusables
-    stars: 8080
+    stars: 8084
     tags:
       - react-native
       - component-library
@@ -1046,7 +1046,7 @@ projects:
     url: https://unistyl.es
   - name: react-scan
     repository_name: aidenybai/react-scan
-    stars: 20827
+    stars: 20831
     tags:
       - react
       - performance
@@ -1054,14 +1054,14 @@ projects:
     url: https://react-scan.com
   - name: Refine
     repository_name: refinedev/refine
-    stars: 34271
+    stars: 34312
     tags:
       - react
       - dashboard
     url: https://refine.dev
   - name: Repomix
     repository_name: yamadashy/repomix
-    stars: 22554
+    stars: 22559
     tags:
       - scraping
       - ai
@@ -1075,21 +1075,21 @@ projects:
     url: https://ripplejs.com
   - name: rrweb
     repository_name: rrweb-io/rrweb
-    stars: 19347
+    stars: 19350
     tags:
       - debug
       - automation
     url: https://www.rrweb.io
   - name: Selenium
     repository_name: SeleniumHQ/selenium
-    stars: 34150
+    stars: 34161
     tags:
       - test
       - automation
     url: https://selenium.dev
   - name: shadcn-vue
     repository_name: unovue/shadcn-vue
-    stars: 9610
+    stars: 9615
     tags:
       - vue
       - component-library
@@ -1103,20 +1103,20 @@ projects:
     url: http://www.getskeleton.com
   - name: Slidev
     repository_name: slidevjs/slidev
-    stars: 44988
+    stars: 45012
     tags:
       - presentation
       - vue
     url: https://sli.dev
   - name: snapDOM
     repository_name: zumerlab/snapdom
-    stars: 7621
+    stars: 7622
     tags:
       - screenshot
     url: https://snapdom.dev
   - name: Solid
     repository_name: solidjs/solid
-    stars: 35358
+    stars: 35370
     tags:
       - framework
       - reactive
@@ -1124,14 +1124,14 @@ projects:
     url: https://solidjs.com
   - name: Stagehand
     repository_name: browserbase/stagehand
-    stars: 21637
+    stars: 21650
     tags:
       - automation
       - ai
     url: https://stagehand.dev
   - name: Starlight
     repository_name: withastro/starlight
-    stars: 8140
+    stars: 8147
     tags:
       - static-site-generator
       - documentation
@@ -1139,7 +1139,7 @@ projects:
     url: https://starlight.astro.build
   - name: Storybook
     repository_name: storybookjs/storybook
-    stars: 89491
+    stars: 89496
     tags:
       - test
       - angular
@@ -1149,14 +1149,14 @@ projects:
     url: https://storybook.js.org
   - name: Strapi
     repository_name: strapi/strapi
-    stars: 71661
+    stars: 71664
     tags:
       - nodejs-framework
       - content-management-system
     url: https://strapi.io
   - name: Supabase
     repository_name: supabase/supabase
-    stars: 99367
+    stars: 99431
     tags:
       - realtime
       - auth
@@ -1166,20 +1166,20 @@ projects:
     url: https://supabase.com
   - name: Svelte
     repository_name: sveltejs/svelte
-    stars: 86114
+    stars: 86134
     tags:
       - framework
       - svelte
     url: https://svelte.dev
   - name: Tabby
     repository_name: Eugeny/tabby
-    stars: 69691
+    stars: 69712
     tags:
       - terminal
     url: https://tabby.sh
   - name: Tailwind CSS
     repository_name: tailwindlabs/tailwindcss
-    stars: 94158
+    stars: 94172
     tags:
       - css-library
       - tailwind
@@ -1188,7 +1188,7 @@ projects:
     url: https://tailwindcss.com
   - name: Tamagui
     repository_name: tamagui/tamagui
-    stars: 13826
+    stars: 13830
     tags:
       - css-in-js
       - react-native
@@ -1198,7 +1198,7 @@ projects:
     url: https://tamagui.dev
   - name: TanStack AI
     repository_name: TanStack/ai
-    stars: 2447
+    stars: 2448
     tags:
       - react
       - vue
@@ -1208,7 +1208,7 @@ projects:
       - ai-agents
   - name: TanStack Query
     repository_name: TanStack/query
-    stars: 48874
+    stars: 48887
     tags:
       - react
       - data
@@ -1220,7 +1220,7 @@ projects:
     url: https://tanstack.com/query
   - name: TanStack Router/TanStack Start
     repository_name: TanStack/router
-    stars: 13932
+    stars: 13944
     tags:
       - angular
       - react
@@ -1232,14 +1232,14 @@ projects:
     url: https://tanstack.com/router
   - name: Tauri
     repository_name: tauri-apps/tauri
-    stars: 104408
+    stars: 104459
     tags:
       - desktop
       - rust
     url: https://tauri.app
   - name: Tesseract.js
     repository_name: naptha/tesseract.js
-    stars: 37941
+    stars: 37943
     tags:
       - image
       - machine-learning
@@ -1248,7 +1248,7 @@ projects:
     url: http://tesseract.projectnaptha.com
   - name: TinyBase
     repository_name: tinyplex/tinybase
-    stars: 4971
+    stars: 4973
     tags:
       - react
       - table
@@ -1257,7 +1257,7 @@ projects:
     url: https://tinybase.org
   - name: TipTap
     repository_name: ueberdosis/tiptap
-    stars: 35767
+    stars: 35778
     tags:
       - react
       - rich-text-editor
@@ -1266,14 +1266,14 @@ projects:
     url: https://tiptap.dev
   - name: Transformers.js
     repository_name: huggingface/transformers.js
-    stars: 15602
+    stars: 15605
     tags:
       - machine-learning
       - ai
     url: https://huggingface.co/docs/transformers.js
   - name: tRPC
     repository_name: trpc/trpc
-    stars: 39797
+    stars: 39802
     tags:
       - nodejs-framework
       - react
@@ -1285,13 +1285,13 @@ projects:
     url: https://tRPC.io
   - name: tsdown
     repository_name: rolldown/tsdown
-    stars: 3702
+    stars: 3705
     tags:
       - build-tool
     url: https://tsdown.dev
   - name: Turborepo
     repository_name: vercel/turborepo
-    stars: 30048
+    stars: 30052
     tags:
       - build-tool
       - scaffolding
@@ -1301,7 +1301,7 @@ projects:
     url: https://turborepo.com
   - name: tweakcn
     repository_name: jnsahaj/tweakcn
-    stars: 9577
+    stars: 9581
     tags:
       - react
       - component-library
@@ -1310,7 +1310,7 @@ projects:
     url: https://tweakcn.com
   - name: Twenty
     repository_name: twentyhq/twenty
-    stars: 40597
+    stars: 40611
     tags:
       - graphql
       - self-hosted
@@ -1318,13 +1318,13 @@ projects:
     url: https://twenty.com
   - name: Ultracite
     repository_name: haydenbleasel/ultracite
-    stars: 2757
+    stars: 2760
     tags:
       - linter
     url: https://www.ultracite.ai
   - name: UnoCSS
     repository_name: unocss/unocss
-    stars: 18694
+    stars: 18697
     tags:
       - css-in-js
       - atomic-css
@@ -1343,14 +1343,14 @@ projects:
     url: https://valtio.dev
   - name: Vendure
     repository_name: vendure-ecommerce/vendure
-    stars: 7988
+    stars: 7991
     tags:
       - graphql
       - ecommerce
     url: https://www.vendure.io
   - name: Vercel AI SDK
     repository_name: vercel/ai
-    stars: 22851
+    stars: 22877
     tags:
       - react
       - vue
@@ -1363,7 +1363,7 @@ projects:
     url: https://ai-sdk.dev
   - name: Void
     repository_name: voideditor/void
-    stars: 28465
+    stars: 28466
     tags:
       - integrated-development-environment
       - desktop-app
@@ -1371,7 +1371,7 @@ projects:
     url: https://voideditor.com
   - name: VoltAgent
     repository_name: VoltAgent/voltagent
-    stars: 6869
+    stars: 6889
     tags:
       - chat
       - ai
@@ -1379,7 +1379,7 @@ projects:
     url: https://voltagent.dev
   - name: VS Code
     repository_name: microsoft/vscode
-    stars: 182892
+    stars: 182935
     tags:
       - integrated-development-environment
       - desktop-app
@@ -1393,20 +1393,20 @@ projects:
     url: https://vue-bits.dev
   - name: Vue Element Admin
     repository_name: PanJiaChen/vue-element-admin
-    stars: 90299
+    stars: 90297
     tags:
       - vue
       - dashboard
   - name: Vue.js
     repository_name: vuejs/core
-    stars: 53283
+    stars: 53292
     tags:
       - framework
       - vue
     url: https://vuejs.org
   - name: Vue.js 2
     repository_name: vuejs/vue
-    stars: 209969
+    stars: 209983
     tags:
       - framework
       - vdom
@@ -1414,13 +1414,13 @@ projects:
     url: http://v2.vuejs.org
   - name: Wails
     repository_name: wailsapp/wails
-    stars: 33347
+    stars: 33357
     tags:
       - desktop
     url: https://wails.io
   - name: Wasp
     repository_name: wasp-lang/wasp
-    stars: 18209
+    stars: 18214
     tags:
       - react
       - compiler
@@ -1440,7 +1440,7 @@ projects:
     url: https://stately.ai/docs
   - name: yaak
     repository_name: mountain-loop/yaak
-    stars: 18192
+    stars: 18203
     tags:
       - http
       - desktop-app
@@ -1455,26 +1455,26 @@ projects:
     url: https://yew.rs
   - name: Zustand
     repository_name: pmndrs/zustand
-    stars: 57473
+    stars: 57483
     tags:
       - react
       - state
     url: https://zustand-demo.pmnd.rs
   - name: husky
     repository_name: typicode/husky
-    stars: 34887
+    stars: 34892
     tags:
       - git-hook
     url: https://typicode.github.io/husky/
   - name: lefthook
     repository_name: evilmartians/lefthook
     url: http://lefthook.dev/
-    stars: 7813
+    stars: 7819
     tags:
       - git-hook
   - name: sveltkit
     repository_name: sveltejs/kit
-    stars: 20371
+    stars: 20368
     tags:
       - fullstack-framework
       - meta-framework
@@ -1482,7 +1482,7 @@ projects:
     url: https://svelte.dev/docs/kit/introduction
   - name: SolidStart
     repository_name: solidjs/solid-start
-    stars: 5829
+    stars: 5830
     tags:
       - fullstack-framework
       - meta-framework
