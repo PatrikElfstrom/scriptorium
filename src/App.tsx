@@ -12,7 +12,6 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   ArrowUpRight,
-  Github,
   Moon,
   Search,
   Sun,
@@ -99,7 +98,7 @@ export function App() {
                   className="inline-flex items-center justify-center rounded-xl border border-border/70 bg-background/85 p-2.5 text-foreground shadow-sm transition-colors outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/20"
                   aria-label="Open scriptorium on GitHub"
                 >
-                  <Github className="size-4" />
+                  <GitHubIcon className="size-4" />
                 </a>
               </div>
             </div>
@@ -271,7 +270,7 @@ export function App() {
                           rel="noreferrer"
                           aria-label={`Open ${tool.name} on GitHub`}
                         >
-                          <Github className="size-4" />
+                          <GitHubIcon className="size-4" />
                         </a>
                       ) : null}
                     </div>
@@ -333,6 +332,19 @@ export function App() {
         </div>
       </section>
     </main>
+  )
+}
+
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.51v-1.98c-2.94.64-3.56-1.25-3.56-1.25-.48-1.21-1.17-1.53-1.17-1.53-.96-.65.08-.64.08-.64 1.06.08 1.62 1.09 1.62 1.09.95 1.62 2.48 1.15 3.08.88.1-.69.37-1.15.67-1.41-2.35-.27-4.83-1.17-4.83-5.24 0-1.16.42-2.1 1.1-2.84-.11-.27-.48-1.37.1-2.85 0 0 .9-.29 2.95 1.08a10.18 10.18 0 0 1 5.38 0c2.04-1.37 2.94-1.08 2.94-1.08.58 1.48.22 2.58.1 2.85.69.74 1.1 1.68 1.1 2.84 0 4.08-2.49 4.97-4.86 5.23.38.33.72.97.72 1.95v2.9c0 .28.19.62.73.51A10.5 10.5 0 0 0 12 1.5Z" />
+    </svg>
   )
 }
 
