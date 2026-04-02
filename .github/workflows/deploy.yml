@@ -1,13 +1,12 @@
-name: Deploy GitHub Pages
+name: CI
 
 on:
   push:
-    branches:
-      - main
+  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: pages-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -15,7 +14,7 @@ env:
   PNPM_VERSION: 10
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -41,27 +40,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build site
-        env:
-          GITHUB_PAGES: "true"
-        run: pnpm build
+      - name: Lint
+        run: pnpm lint
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: ./dist
+      - name: Typecheck
+        run: pnpm typecheck
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Test
+        run: pnpm test
+
+      - name: Build frontend
+        run: pnpm build:app
+
+      - name: Build worker
+        run: pnpm build:worker

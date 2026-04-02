@@ -9,8 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-worker
 dist-ssr
 *.local
+.data
+.wrangler
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +25,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.env

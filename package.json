@@ -5,16 +5,27 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "db:prepare": "tsx ./scripts/prepare-catalog-database.ts",
+    "db:reset": "tsx ./scripts/reset-catalog-database.ts",
+    "dev:worker": "pnpm db:prepare && tsx watch ./scripts/dev-worker.ts",
+    "dev:worker:cf": "pnpm db:prepare && wrangler dev worker/index.ts",
+    "build": "pnpm typecheck && pnpm build:app && pnpm build:worker",
+    "build:app": "vite build",
+    "build:worker": "wrangler deploy --dry-run --outdir dist-worker",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "sync:github-metadata": "node ./scripts/sync-github-metadata.mjs",
-    "typecheck": "tsc --noEmit",
+    "import:algolia-packages": "tsx ./scripts/import-algolia-packages.ts",
+    "sync:ecosystems-popular": "tsx ./scripts/sync-ecosystems-popular.ts",
+    "sync:github-metadata": "tsx ./scripts/sync-github-metadata.ts",
+    "sync:npm-metadata": "tsx ./scripts/sync-npm-metadata.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -b",
     "preview": "vite preview"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@libsql/client": "^0.17.2",
     "@tailwindcss/vite": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -24,25 +35,28 @@
     "shadcn": "^4.1.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
-    "tw-animate-css": "^1.4.0",
-    "yaml": "^2.8.3"
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@typescript/native-preview": "^7.0.0-dev.20260330.1",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "jsdom": "^27.4.0",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsx": "^4.21.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.79.0"
   },
   "volta": {
     "node": "24.14.1"

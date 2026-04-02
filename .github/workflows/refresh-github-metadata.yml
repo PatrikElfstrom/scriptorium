@@ -1,4 +1,4 @@
-name: Refresh GitHub Metadata
+name: Refresh Catalog Metadata
 
 on:
   schedule:
@@ -17,13 +17,11 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: main
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -41,23 +39,13 @@ jobs:
 
       - name: Refresh GitHub metadata
         env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm sync:github-metadata
 
-      - name: Check for changes
-        id: changes
-        run: |
-          if git diff --quiet -- src/data/projects.yaml; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_changes=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Commit refreshed metadata
-        if: steps.changes.outputs.has_changes == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/projects.yaml
-          git commit -m "chore: refresh GitHub metadata"
-          git push origin HEAD:main
+      - name: Refresh npm metadata
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: pnpm sync:npm-metadata
