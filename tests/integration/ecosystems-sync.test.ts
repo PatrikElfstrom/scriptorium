@@ -1,19 +1,23 @@
-import { syncEcosystemsPopular } from "../../server/catalog/admin-service"
+import {
+  pruneEcosystemsPackages,
+  syncEcosystemsPopular,
+} from "../../server/catalog/admin-service"
 import { resetCatalogSchema } from "../../server/catalog/schema"
 import { createTestCatalogDatabase, seedCatalogPackage } from "../helpers/catalog-test-db"
 
 describe("ecosyste.ms popular sync", () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
   it("paginates downloads-ranked packages and sends the required headers", async () => {
     const database = await createTestCatalogDatabase()
-    const pageOnePackages = Array.from({ length: 100 }, (_, index) =>
+    const pageOnePackages = Array.from({ length: 400 }, (_, index) =>
       createEcosystemsFixture({
         name: `pkg-${index + 1}`,
         downloads: 100_000 - index,
-        dependentPackagesCount: 500 - index,
+        dependentPackagesCount: 1_000 - index,
       })
     )
     const pageTwoPackage = createEcosystemsFixture({
@@ -60,12 +64,12 @@ describe("ecosyste.ms popular sync", () => {
       const result = await syncEcosystemsPopular(database.client, {
         ecosystemsBaseUrl: "https://packages.ecosyste.ms/api/v1",
         fromAddress: "me@patrikelfstrom.se",
-        syncLimit: 101,
+        syncLimit: 401,
         updatedAfter: "2025-01-01T00:00:00.000Z",
         userAgent: "scriptorium-test/0.1.1",
       })
 
-      expect(result).toEqual({ syncedCount: 101 })
+      expect(result).toEqual({ syncedCount: 401 })
 
       expect(
         requestCalls.map(({ url }) => ({
@@ -78,14 +82,14 @@ describe("ecosyste.ms popular sync", () => {
       ).toEqual([
         {
           page: "1",
-          perPage: "100",
+          perPage: "400",
           sort: "downloads",
           order: "desc",
           updatedAfter: "2025-01-01T00:00:00.000Z",
         },
         {
           page: "2",
-          perPage: "100",
+          perPage: "400",
           sort: "downloads",
           order: "desc",
           updatedAfter: "2025-01-01T00:00:00.000Z",
@@ -209,6 +213,69 @@ describe("ecosyste.ms popular sync", () => {
     }
   })
 
+  it("skips packages whose latest release is older than one year", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-04-03T00:00:00.000Z"))
+
+    const database = await createTestCatalogDatabase()
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+
+      if (url.includes("/registries/npmjs.org/packages")) {
+        return jsonResponse([
+          createEcosystemsFixture({
+            name: "fresh-package",
+            downloads: 1000,
+            dependentPackagesCount: 501,
+            latestReleasePublishedAt: "2025-09-01T00:00:00.000Z",
+          }),
+          createEcosystemsFixture({
+            name: "stale-package",
+            downloads: 2000,
+            dependentPackagesCount: 700,
+            latestReleasePublishedAt: "2024-03-31T00:00:00.000Z",
+          }),
+          createEcosystemsFixture({
+            name: "low-impact-package",
+            downloads: 3000,
+            dependentPackagesCount: 500,
+            latestReleasePublishedAt: "2026-02-01T00:00:00.000Z",
+          }),
+        ])
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`)
+    })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    try {
+      const result = await syncEcosystemsPopular(database.client, {
+        ecosystemsBaseUrl: "https://packages.ecosyste.ms/api/v1",
+        fromAddress: "me@patrikelfstrom.se",
+        syncLimit: 10,
+        updatedAfter: "2025-01-01T00:00:00.000Z",
+        userAgent: "scriptorium-test/0.1.1",
+      })
+
+      expect(result).toEqual({ syncedCount: 1 })
+
+      const packageRows = await database.client.execute({
+        sql: `
+          SELECT package_key
+          FROM packages
+          ORDER BY package_key ASC
+        `,
+      })
+
+      expect(packageRows.rows.map((row) => String(row.package_key))).toEqual([
+        "npm:fresh-package",
+      ])
+    } finally {
+      await database.cleanup()
+    }
+  })
+
   it("includes the failing ecosyste.ms request URL in fetch errors", async () => {
     const database = await createTestCatalogDatabase()
     const fetchMock = vi.fn(async () =>
@@ -231,7 +298,7 @@ describe("ecosyste.ms popular sync", () => {
           userAgent: "scriptorium-test/0.1.1",
         })
       ).rejects.toThrow(
-        'Failed to fetch ecosyste.ms packages from https://packages.ecosyste.ms/api/v1/registries/npmjs.org/packages?page=1&per_page=100&updated_after=2025-01-01T00%3A00%3A00.000Z&sort=downloads&order=desc: 500 Internal Server Error'
+        'Failed to fetch ecosyste.ms packages from https://packages.ecosyste.ms/api/v1/registries/npmjs.org/packages?page=1&per_page=400&updated_after=2025-01-01T00%3A00%3A00.000Z&sort=downloads&order=desc: 500 Internal Server Error'
       )
     } finally {
       await database.cleanup()
@@ -317,6 +384,164 @@ describe("ecosyste.ms popular sync", () => {
       await database.cleanup()
     }
   })
+
+  it("deletes npm packages that fail the ecosyste.ms retention criteria", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-04-03T00:00:00.000Z"))
+
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageKey: "npm:keep-me",
+        sourceType: "npm",
+        sourceName: "keep-me",
+        tags: ["keep-tag"],
+      })
+      await seedCatalogPackage(database.client, {
+        packageKey: "npm:stale-package",
+        sourceType: "npm",
+        sourceName: "stale-package",
+        tags: ["stale-tag"],
+      })
+      await seedCatalogPackage(database.client, {
+        packageKey: "npm:low-impact-package",
+        sourceType: "npm",
+        sourceName: "low-impact-package",
+        tags: ["low-tag"],
+      })
+      await seedCatalogPackage(database.client, {
+        packageKey: "npm:no-raw-package",
+        sourceType: "npm",
+        sourceName: "no-raw-package",
+        tags: ["missing-raw-tag"],
+      })
+      await seedCatalogPackage(database.client, {
+        packageKey: "github:keep-repo",
+        sourceType: "github",
+        sourceName: "keep-repo",
+        tags: ["github-tag"],
+      })
+
+      await database.client.execute({
+        sql: `
+          INSERT INTO raw_ecosystems_packages (
+            package_key,
+            source_type,
+            source_name,
+            downloads,
+            downloads_period,
+            dependent_packages_count,
+            raw_json,
+            fetched_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          "npm:keep-me",
+          "npm",
+          "keep-me",
+          1000,
+          "last-month",
+          501,
+          JSON.stringify(
+            createEcosystemsFixture({
+              name: "keep-me",
+              downloads: 1000,
+              dependentPackagesCount: 501,
+              latestReleasePublishedAt: "2025-12-01T00:00:00.000Z",
+            })
+          ),
+          "2026-04-03T00:00:00.000Z",
+        ],
+      })
+      await database.client.execute({
+        sql: `
+          INSERT INTO raw_ecosystems_packages (
+            package_key,
+            source_type,
+            source_name,
+            downloads,
+            downloads_period,
+            dependent_packages_count,
+            raw_json,
+            fetched_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          "npm:stale-package",
+          "npm",
+          "stale-package",
+          1000,
+          "last-month",
+          900,
+          JSON.stringify(
+            createEcosystemsFixture({
+              name: "stale-package",
+              downloads: 1000,
+              dependentPackagesCount: 900,
+              latestReleasePublishedAt: "2024-04-01T00:00:00.000Z",
+            })
+          ),
+          "2026-04-03T00:00:00.000Z",
+        ],
+      })
+      await database.client.execute({
+        sql: `
+          INSERT INTO raw_ecosystems_packages (
+            package_key,
+            source_type,
+            source_name,
+            downloads,
+            downloads_period,
+            dependent_packages_count,
+            raw_json,
+            fetched_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          "npm:low-impact-package",
+          "npm",
+          "low-impact-package",
+          1000,
+          "last-month",
+          500,
+          JSON.stringify(
+            createEcosystemsFixture({
+              name: "low-impact-package",
+              downloads: 1000,
+              dependentPackagesCount: 500,
+              latestReleasePublishedAt: "2026-02-01T00:00:00.000Z",
+            })
+          ),
+          "2026-04-03T00:00:00.000Z",
+        ],
+      })
+
+      const result = await pruneEcosystemsPackages(database.client, {
+        now: new Date("2026-04-03T00:00:00.000Z"),
+      })
+
+      expect(result).toEqual({ deletedCount: 3 })
+
+      const packageRows = await database.client.execute({
+        sql: `SELECT package_key FROM packages ORDER BY package_key ASC`,
+      })
+      const tagRows = await database.client.execute({
+        sql: `SELECT tag_id FROM tags ORDER BY tag_id ASC`,
+      })
+
+      expect(packageRows.rows.map((row) => String(row.package_key))).toEqual([
+        "github:keep-repo",
+        "npm:keep-me",
+      ])
+      expect(tagRows.rows.map((row) => String(row.tag_id))).toEqual([
+        "github-tag",
+        "keep-tag",
+      ])
+    } finally {
+      await database.cleanup()
+    }
+  })
 })
 
 function createEcosystemsFixture(input: {
@@ -328,6 +553,7 @@ function createEcosystemsFixture(input: {
   keywords?: string[]
   downloads: number
   dependentPackagesCount: number
+  latestReleasePublishedAt?: string
   repoMetadata?: Record<string, unknown> | null
 }) {
   return {
@@ -346,7 +572,8 @@ function createEcosystemsFixture(input: {
     namespace: null,
     versions_count: 10,
     first_release_published_at: "2020-01-01T00:00:00.000Z",
-    latest_release_published_at: "2026-01-01T00:00:00.000Z",
+    latest_release_published_at:
+      input.latestReleasePublishedAt ?? "2026-01-01T00:00:00.000Z",
     latest_release_number: "1.0.0",
     last_synced_at: "2026-04-02T00:00:00.000Z",
     created_at: "2022-01-01T00:00:00.000Z",

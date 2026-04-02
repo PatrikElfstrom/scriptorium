@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "import:algolia-packages": "tsx ./scripts/import-algolia-packages.ts",
+    "prune:ecosystems-packages": "tsx ./scripts/prune-ecosystems-packages.ts",
     "sync:ecosystems-popular": "tsx ./scripts/sync-ecosystems-popular.ts",
     "sync:github-metadata": "tsx ./scripts/sync-github-metadata.ts",
     "sync:npm-metadata": "tsx ./scripts/sync-npm-metadata.ts",

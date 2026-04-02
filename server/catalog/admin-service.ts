@@ -260,6 +260,52 @@ export async function syncGitHubMetadata(
   }
 }
 
+export async function pruneEcosystemsPackages(
+  client: CatalogDatabaseClient,
+  options: PruneEcosystemsPackagesOptions = {}
+) {
+  const result = await client.execute(`
+    SELECT p.package_key, rep.raw_json
+    FROM packages p
+    LEFT JOIN raw_ecosystems_packages rep ON rep.package_key = p.package_key
+    WHERE p.source_type = 'npm'
+  `)
+
+  const packageKeysToDelete = result.rows
+    .filter((row) => shouldDeleteEcosystemsPackageRow(row.raw_json, options.now))
+    .map((row) => String(row.package_key))
+
+  if (packageKeysToDelete.length === 0) {
+    return { deletedCount: 0 }
+  }
+
+  for (const batch of chunkValues(packageKeysToDelete, 100)) {
+    const placeholders = batch.map(() => "?").join(", ")
+
+    await client.execute({
+      sql: `DELETE FROM packages WHERE package_key IN (${placeholders})`,
+      args: batch,
+    })
+    await client.execute({
+      sql: `DELETE FROM raw_ecosystems_packages WHERE package_key IN (${placeholders})`,
+      args: batch,
+    })
+  }
+
+  await client.execute(`
+    DELETE FROM tag_aliases
+    WHERE tag_id NOT IN (SELECT DISTINCT tag_id FROM package_tags)
+  `)
+  await client.execute(`
+    DELETE FROM tags
+    WHERE tag_id NOT IN (SELECT DISTINCT tag_id FROM package_tags)
+  `)
+
+  return {
+    deletedCount: packageKeysToDelete.length,
+  }
+}
+
 export type ImportAlgoliaPackagesOptions = {
   queries: string[]
   algoliaAppId: string
@@ -287,6 +333,10 @@ export type SyncNpmMetadataOptions = {
 export type SyncGitHubMetadataOptions = {
   githubApiBaseUrl: string
   githubToken?: string
+}
+
+export type PruneEcosystemsPackagesOptions = {
+  now?: Date
 }
 
 type AlgoliaHit = {
@@ -494,7 +544,7 @@ function compareAlgoliaHits(left: AlgoliaHit, right: AlgoliaHit) {
 }
 
 async function fetchEcosystemsPopularPackages(options: SyncEcosystemsPopularOptions) {
-  const pageSize = 100
+  const pageSize = 400
   const packages: EcosystemsPackage[] = []
 
   for (let page = 1; packages.length < options.syncLimit; page += 1) {
@@ -556,8 +606,20 @@ function normalizeEcosystemsPackage(entry: unknown) {
 
   const candidate = entry as Record<string, unknown>
   const name = normalizeOptionalString(candidate.name)
+  const latestReleasePublishedAt = normalizeTimestamp(
+    candidate.latest_release_published_at
+  )
+  const dependentPackagesCount = normalizeInteger(
+    candidate.dependent_packages_count
+  )
 
-  if (!name) {
+  if (
+    !name ||
+    !meetsEcosystemsRetentionCriteria({
+      dependentPackagesCount,
+      latestReleasePublishedAt,
+    })
+  ) {
     return undefined
   }
 
@@ -580,7 +642,7 @@ function normalizeEcosystemsPackage(entry: unknown) {
     stars: normalizeNullableInteger(repoMetadata?.stargazers_count),
     downloads: normalizeInteger(candidate.downloads),
     downloadsPeriod: normalizeOptionalString(candidate.downloads_period) ?? null,
-    dependentPackagesCount: normalizeInteger(candidate.dependent_packages_count),
+    dependentPackagesCount,
     npmTags: normalizeStringArray(candidate.keywords_array),
     githubTags: normalizeStringArray(repoMetadata?.topics),
     rawJson: JSON.stringify(entry),
@@ -834,6 +896,67 @@ function normalizeModifiedTimestamp(value: unknown) {
 
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
+function normalizeTimestamp(value: unknown) {
+  if (typeof value !== "string") {
+    return undefined
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
+function isRecentRelease(value?: Date, now = new Date()) {
+  if (!value) {
+    return false
+  }
+
+  const cutoff = new Date(now)
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 1)
+
+  return value >= cutoff
+}
+
+const MIN_DEPENDENT_PACKAGES_COUNT = 500
+
+function meetsEcosystemsRetentionCriteria(input: {
+  dependentPackagesCount: number
+  latestReleasePublishedAt?: Date
+  now?: Date
+}) {
+  return (
+    input.dependentPackagesCount > MIN_DEPENDENT_PACKAGES_COUNT &&
+    isRecentRelease(input.latestReleasePublishedAt, input.now)
+  )
+}
+
+function shouldDeleteEcosystemsPackageRow(rawJson: unknown, now = new Date()) {
+  if (typeof rawJson !== "string") {
+    return true
+  }
+
+  try {
+    const parsed = JSON.parse(rawJson) as Record<string, unknown>
+
+    return !meetsEcosystemsRetentionCriteria({
+      dependentPackagesCount: normalizeInteger(parsed.dependent_packages_count),
+      latestReleasePublishedAt: normalizeTimestamp(parsed.latest_release_published_at),
+      now,
+    })
+  } catch {
+    return true
+  }
+}
+
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = []
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size))
+  }
+
+  return chunks
 }
 
 function normalizeInteger(value: unknown) {
