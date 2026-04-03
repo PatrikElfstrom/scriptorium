@@ -51,10 +51,12 @@ export async function seedCatalogPackage(
     displayName: input.displayName ?? input.sourceName,
     searchName: (input.displayName ?? input.sourceName).trim().toLowerCase(),
     description: input.description ?? null,
+    homepageUrl: input.homepageUrl ?? null,
     primaryUrl:
       input.primaryUrl ?? createPrimaryUrl(input.sourceType, input.sourceName),
     repositoryName: input.repositoryName ?? null,
     npmPackageName: input.npmPackageName ?? null,
+    publishedAt: input.publishedAt ?? null,
     stars: input.stars ?? null,
     downloads: input.downloads ?? 0,
     downloadsPeriod: input.downloadsPeriod ?? null,

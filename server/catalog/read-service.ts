@@ -40,9 +40,11 @@ export async function searchCatalog(
           p.source_name,
           p.display_name,
           p.description,
+          p.homepage_url,
           p.primary_url,
           p.repository_name,
           p.npm_package_name,
+          p.last_published_at,
           p.stars,
           p.downloads,
           p.downloads_period,
@@ -91,9 +93,11 @@ export async function searchCatalog(
       sourceName: String(row.source_name),
       name: String(row.display_name),
       description: normalizeNullableString(row.description),
+      homepageUrl: normalizeNullableString(row.homepage_url),
       url: normalizeNullableString(row.primary_url),
       repositoryName: normalizeNullableString(row.repository_name),
       npmPackageName: normalizeNullableString(row.npm_package_name),
+      publishedAt: normalizeNullableString(row.last_published_at),
       stars: normalizeNullableNumber(row.stars),
       downloads: normalizeNumber(row.downloads),
       downloadsPeriod: normalizeNullableString(row.downloads_period),
@@ -197,6 +201,8 @@ function getCatalogOrderByClause(
   switch (sort) {
     case "stars":
       return `COALESCE(stars, 0) ${normalizedDirection}, LOWER(display_name) ASC, package_key ASC`
+    case "published":
+      return `CASE WHEN last_published_at IS NULL OR last_published_at = '' THEN 1 ELSE 0 END ASC, last_published_at ${normalizedDirection}, LOWER(display_name) ASC, package_key ASC`
     case "tags":
       return `LOWER(tags_sort_value) ${normalizedDirection}, LOWER(display_name) ASC, package_key ASC`
     case "name":

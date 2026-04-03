@@ -10,9 +10,11 @@ export type CatalogPackageRecord = {
   displayName: string
   searchName: string
   description: string | null
+  homepageUrl: string | null
   primaryUrl: string | null
   repositoryName: string | null
   npmPackageName: string | null
+  publishedAt: string | null
   stars: number | null
   downloads: number
   downloadsPeriod: string | null
@@ -71,9 +73,11 @@ export function createUpsertPackageStatement(
         display_name,
         search_name,
         description,
+        homepage_url,
         primary_url,
         repository_name,
         npm_package_name,
+        last_published_at,
         stars,
         downloads,
         downloads_period,
@@ -82,11 +86,12 @@ export function createUpsertPackageStatement(
         npm_synced_at,
         github_synced_at,
         is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(package_key) DO UPDATE SET
         display_name = excluded.display_name,
         search_name = excluded.search_name,
         description = COALESCE(excluded.description, packages.description),
+        homepage_url = COALESCE(excluded.homepage_url, packages.homepage_url),
         primary_url = CASE
           WHEN excluded.primary_url IS NULL OR excluded.primary_url = ''
             THEN packages.primary_url
@@ -94,6 +99,7 @@ export function createUpsertPackageStatement(
         END,
         repository_name = COALESCE(excluded.repository_name, packages.repository_name),
         npm_package_name = COALESCE(excluded.npm_package_name, packages.npm_package_name),
+        last_published_at = COALESCE(excluded.last_published_at, packages.last_published_at),
         stars = COALESCE(excluded.stars, packages.stars),
         downloads = excluded.downloads,
         downloads_period = COALESCE(excluded.downloads_period, packages.downloads_period),
@@ -110,9 +116,11 @@ export function createUpsertPackageStatement(
       packageRecord.displayName,
       packageRecord.searchName,
       packageRecord.description,
+      packageRecord.homepageUrl,
       packageRecord.primaryUrl ?? "",
       packageRecord.repositoryName,
       packageRecord.npmPackageName,
+      packageRecord.publishedAt,
       packageRecord.stars,
       packageRecord.downloads,
       packageRecord.downloadsPeriod,

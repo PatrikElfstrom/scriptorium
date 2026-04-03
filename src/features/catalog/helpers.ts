@@ -206,6 +206,25 @@ export function formatStarCount(stars?: number) {
   return `${Math.round(stars / 1_000_000)}m`
 }
 
+export function formatPublishedDate(value?: string) {
+  if (!value) {
+    return ""
+  }
+
+  const parsed = new Date(value)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return ""
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(parsed)
+}
+
 function scoreSuggestion(tag: string, token: string) {
   if (tag === token) {
     return 4

@@ -12,6 +12,14 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { CatalogPage } from "@/features/catalog/CatalogPage"
 import { createCatalogApiUrl } from "@/features/catalog/api"
 
+const TEST_ROW_HEIGHT = 68
+const TEST_VIEWPORT_HEIGHT = 420
+const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect
+const originalClientHeightDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "clientHeight"
+)
+
 function renderCatalogPage(url = "/") {
   window.history.replaceState({}, "", url)
 
@@ -42,31 +50,7 @@ describe("CatalogPage", () => {
       },
     })
 
-    Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
-      configurable: true,
-      value() {
-        return {
-          width: 1200,
-          height: 420,
-          top: 0,
-          left: 0,
-          bottom: 420,
-          right: 1200,
-          x: 0,
-          y: 0,
-          toJSON() {
-            return {}
-          },
-        }
-      },
-    })
-
-    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
-      configurable: true,
-      get() {
-        return 420
-      },
-    })
+    installVirtualLayoutMocks()
 
     vi.stubGlobal(
       "ResizeObserver",
@@ -79,6 +63,7 @@ describe("CatalogPage", () => {
   })
 
   afterEach(() => {
+    restoreVirtualLayoutMocks()
     vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
@@ -127,8 +112,8 @@ describe("CatalogPage", () => {
 
     const tableBody = document.querySelector('[data-slot="table-body"]')
     expect(tableBody).not.toBeNull()
-    expect(Number.parseInt((tableBody as HTMLElement).style.height, 10)).toBeGreaterThan(
-      30 * 92
+    expect(Number.parseInt((tableBody as HTMLElement).style.height, 10)).toBe(
+      buildCatalogItems().length * TEST_ROW_HEIGHT
     )
     expect(
       fetchMock.mock.calls.some(([request]) =>
@@ -169,10 +154,10 @@ describe("CatalogPage", () => {
     renderCatalogPage()
     await screen.findByText("React")
 
-    fireEvent.click(screen.getByRole("button", { name: "Stars" }))
+    fireEvent.click(screen.getByRole("button", { name: "Published" }))
 
     await waitFor(() => {
-      expect(window.location.search).toContain("sort=stars")
+      expect(window.location.search).toContain("sort=published")
       expect(window.location.search).toContain("direction=asc")
     })
 
@@ -201,6 +186,32 @@ describe("CatalogPage", () => {
     renderCatalogPage()
 
     expect(await screen.findByText("Search request failed with 500.")).toBeTruthy()
+  })
+
+  it("shows published dates and package action links without the description line", async () => {
+    vi.stubGlobal("fetch", vi.fn(createSuccessFetch))
+
+    renderCatalogPage()
+
+    expect(
+      (await screen.findByRole("link", { name: "React" })).getAttribute("href")
+    ).toBe("https://www.npmjs.com/package/react")
+    expect(screen.getByText("Published")).toBeTruthy()
+    expect(screen.queryByText("UI library")).toBeNull()
+    expect(screen.getByText("Jan 1, 2026")).toBeTruthy()
+    expect(screen.getByRole("link", { name: "facebook/react" }).getAttribute("href")).toBe(
+      "https://github.com/facebook/react"
+    )
+    expect(
+      Array.from(document.querySelectorAll('a[href="https://react.dev"]')).some((link) =>
+        link.textContent?.includes("homepage")
+      )
+    ).toBe(true)
+    expect(
+      Array.from(
+        document.querySelectorAll('a[href="https://www.npmjs.com/package/react"]')
+      ).some((link) => link.textContent?.includes("npm"))
+    ).toBe(true)
   })
 
   it("loads the next page when scrolling near the end of the virtualized list", async () => {
@@ -247,6 +258,65 @@ function createTestQueryClient() {
       },
     },
   })
+}
+
+function installVirtualLayoutMocks() {
+  Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+    configurable: true,
+    value(this: HTMLElement) {
+      if (this.dataset.slot === "table-container") {
+        return createRect(TEST_VIEWPORT_HEIGHT)
+      }
+
+      if (this.dataset.slot === "table-row" && this.hasAttribute("data-index")) {
+        return createRect(TEST_ROW_HEIGHT)
+      }
+
+      return originalGetBoundingClientRect.call(this)
+    },
+  })
+
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+    configurable: true,
+    get(this: HTMLElement) {
+      if (this.dataset.slot === "table-container") {
+        return TEST_VIEWPORT_HEIGHT
+      }
+
+      return originalClientHeightDescriptor?.get?.call(this) ?? 0
+    },
+  })
+}
+
+function restoreVirtualLayoutMocks() {
+  Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+    configurable: true,
+    value: originalGetBoundingClientRect,
+  })
+
+  if (originalClientHeightDescriptor) {
+    Object.defineProperty(
+      HTMLElement.prototype,
+      "clientHeight",
+      originalClientHeightDescriptor
+    )
+  }
+}
+
+function createRect(height: number) {
+  return {
+    width: 1200,
+    height,
+    top: 0,
+    left: 0,
+    bottom: height,
+    right: 1200,
+    x: 0,
+    y: 0,
+    toJSON() {
+      return {}
+    },
+  }
 }
 
 function createSuccessFetch(request: RequestInfo | URL) {
@@ -326,6 +396,21 @@ function buildSearchResponse(searchParams: URLSearchParams) {
       if (starDelta !== 0) {
         return starDelta * multiplier
       }
+    } else if (sort === "published") {
+      const leftPublished = left.publishedAt ?? ""
+      const rightPublished = right.publishedAt ?? ""
+      const leftMissing = leftPublished.length === 0 ? 1 : 0
+      const rightMissing = rightPublished.length === 0 ? 1 : 0
+      const missingDelta = leftMissing - rightMissing
+
+      if (missingDelta !== 0) {
+        return missingDelta
+      }
+
+      const publishedDelta = leftPublished.localeCompare(rightPublished)
+      if (publishedDelta !== 0) {
+        return publishedDelta * multiplier
+      }
     } else if (sort === "tags") {
       const tagDelta = left.tags.join(" ").localeCompare(right.tags.join(" "))
       if (tagDelta !== 0) {
@@ -359,9 +444,11 @@ function buildCatalogItems() {
       sourceName: "react",
       name: "React",
       description: "UI library",
+      homepageUrl: "https://react.dev",
       url: "https://react.dev",
       repositoryName: "facebook/react",
       npmPackageName: "react",
+      publishedAt: "2026-01-01T00:00:00.000Z",
       stars: 200_000,
       downloads: 1000,
       downloadsPeriod: "last-month",
@@ -374,9 +461,11 @@ function buildCatalogItems() {
       sourceName: "vue",
       name: "Vue",
       description: "Progressive framework",
+      homepageUrl: "https://vuejs.org",
       url: "https://vuejs.org",
       repositoryName: "vuejs/core",
       npmPackageName: "vue",
+      publishedAt: "2025-12-15T00:00:00.000Z",
       stars: 150_000,
       downloads: 800,
       downloadsPeriod: "last-month",
@@ -389,9 +478,11 @@ function buildCatalogItems() {
       sourceName: "astro",
       name: "Astro",
       description: "Static site framework",
+      homepageUrl: "https://astro.build",
       url: "https://astro.build",
       repositoryName: "withastro/astro",
       npmPackageName: "astro",
+      publishedAt: "2025-11-20T00:00:00.000Z",
       stars: 45_000,
       downloads: 700,
       downloadsPeriod: "last-month",
@@ -406,9 +497,11 @@ function buildCatalogItems() {
     sourceName: `tool-${index}`,
     name: `Tool ${String(index).padStart(3, "0")}`,
     description: `Generated library ${index}`,
+    homepageUrl: `https://example.com/tool-${index}`,
     url: `https://example.com/tool-${index}`,
     repositoryName: `example/tool-${index}`,
     npmPackageName: `tool-${index}`,
+    publishedAt: "2025-01-01T00:00:00.000Z",
     stars: 1_000 - index,
     downloads: 100,
     downloadsPeriod: "last-month",

@@ -1,4 +1,4 @@
-name: Refresh Catalog Metadata
+name: Refresh Catalog Data
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: refresh-github-metadata-${{ github.ref || github.run_id }}
+  group: refresh-catalog-data-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -37,15 +37,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Refresh GitHub metadata
+      - name: Refresh ecosyste.ms package data
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm sync:github-metadata
+        run: pnpm sync:ecosystems-popular
 
-      - name: Refresh npm metadata
+      - name: Prune stale ecosyste.ms packages
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-        run: pnpm sync:npm-metadata
+        run: pnpm prune:ecosystems-packages

@@ -7,11 +7,13 @@ export type CatalogRow = {
   id: string
   name: string
   description?: string
+  homepageUrl?: string
   url?: string
   repositoryName?: string
   github?: string
   npmPackageName?: string
   npmPackageUrl?: string
+  publishedAt?: string
   stars?: number
   tags: string[]
 }

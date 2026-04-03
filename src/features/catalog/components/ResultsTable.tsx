@@ -4,8 +4,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { ArrowUpRight } from "lucide-react"
-import type { Dispatch, SetStateAction } from "react"
+import { Link as LinkIcon } from "lucide-react"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
 import {
   useEffect,
   useRef,
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 
 import {
   formatStarCount,
+  formatPublishedDate,
   getAriaSort,
   getTagColorStyle,
   normalizeValue,
@@ -55,7 +56,7 @@ export function ResultsTable({
   totalRows: number
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const gridTemplateColumns = "minmax(0,0.9fr) 7rem minmax(22rem,1.1fr)"
+  const gridTemplateColumns = "minmax(0,0.85fr) 7rem 8.5rem minmax(18rem,1fr)"
   const totalRowCount = Math.max(totalRows, rows.length)
   const columns = [
     {
@@ -71,53 +72,49 @@ export function ResultsTable({
       ),
       cell: ({ row }: { row: { original: CatalogRow } }) => {
         const tool = row.original
+        const nameHref = tool.npmPackageUrl ?? tool.url
 
         return (
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-1">
-              {tool.url ? (
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="min-w-0 flex-1">
+              {nameHref ? (
                 <a
-                  className="inline-flex max-w-full min-w-0 items-center gap-2 transition-colors hover:text-primary"
-                  href={tool.url}
+                  className="block min-w-0 truncate transition-colors hover:text-primary"
+                  href={nameHref}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <span className="block min-w-0 truncate">{tool.name}</span>
-                  <ArrowUpRight className="size-3.5 shrink-0" />
+                  {tool.name}
                 </a>
               ) : (
                 <span className="block min-w-0 truncate">{tool.name}</span>
               )}
-              {tool.npmPackageName || tool.description ? (
-                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-normal text-muted-foreground">
-                  {tool.npmPackageUrl && tool.npmPackageName ? (
-                    <a
-                      href={tool.npmPackageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 font-mono transition-colors hover:text-foreground"
-                    >
-                      {tool.npmPackageName}
-                    </a>
-                  ) : null}
-                  {tool.description ? (
-                    <span className="block min-w-0 flex-1 truncate">
-                      {tool.description}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
-            {tool.github ? (
-              <a
-                className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/20"
-                href={tool.github}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Open ${tool.name} on GitHub`}
-              >
-                <GitHubIcon className="size-4" />
-              </a>
+            {tool.github || tool.npmPackageUrl || tool.homepageUrl ? (
+              <div className="ml-auto flex shrink-0 items-center gap-4 text-xs text-muted-foreground">
+                {tool.github ? (
+                  <MetadataLink
+                    href={tool.github}
+                    label={tool.repositoryName ?? "github"}
+                    icon={<GitHubIcon className="size-3.5" />}
+                    monospace
+                  />
+                ) : null}
+                {tool.npmPackageUrl ? (
+                  <MetadataLink
+                    href={tool.npmPackageUrl}
+                    label="npm"
+                    icon={<NpmIcon className="size-3.5" />}
+                  />
+                ) : null}
+                {tool.homepageUrl ? (
+                  <MetadataLink
+                    href={tool.homepageUrl}
+                    label="homepage"
+                    icon={<LinkIcon className="size-3.5" />}
+                  />
+                ) : null}
+              </div>
             ) : null}
           </div>
         )
@@ -136,6 +133,21 @@ export function ResultsTable({
       ),
       cell: ({ row }: { row: { original: CatalogRow } }) =>
         formatStarCount(row.original.stars),
+    },
+    {
+      id: "published",
+      accessorFn: (row: CatalogRow) => row.publishedAt ?? "",
+      header: () => (
+        <SortButton
+          active={sortState.column === "published"}
+          direction={sortState.direction}
+          label="Published"
+          onClick={() => toggleSortColumn("published", setSortState)}
+        />
+      ),
+      cell: ({ row }: { row: { original: CatalogRow } }) => (
+        <span>{formatPublishedDate(row.original.publishedAt) || "—"}</span>
+      ),
     },
     {
       id: "tags",
@@ -295,12 +307,21 @@ export function ResultsTable({
             >
               {headerGroup.headers.map((header) => {
                 const alignRight = header.id === "stars"
+                const sortable =
+                  header.id === "name"
+                  || header.id === "stars"
+                  || header.id === "published"
+                  || header.id === "tags"
 
                 return (
                   <th
                     key={header.id}
                     data-slot="table-head"
-                    aria-sort={getAriaSort(header.id as SortState["column"], sortState)}
+                    aria-sort={
+                      sortable
+                        ? getAriaSort(header.id as SortState["column"], sortState)
+                        : undefined
+                    }
                     className={`flex h-11 items-center px-4 text-left text-[0.7rem] font-semibold tracking-[0.24em] text-muted-foreground uppercase ${
                       alignRight ? "justify-end text-right" : "justify-start"
                     }`}
@@ -349,6 +370,10 @@ export function ResultsTable({
                             cell.column.id === "name"
                               ? "min-w-0 font-medium text-foreground"
                               : ""
+                          } ${
+                            cell.column.id === "published"
+                              ? "text-muted-foreground tabular-nums"
+                              : ""
                           } ${alignRight ? "text-right text-muted-foreground tabular-nums" : ""}`}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -393,7 +418,7 @@ function TableMessage({
         <tbody>
           <tr className="border-b border-border/60 bg-background/65 transition-colors">
             <td
-              colSpan={3}
+              colSpan={4}
               className={`px-4 py-10 text-center text-sm ${
                 tone === "destructive" ? "text-destructive" : "text-muted-foreground"
               }`}
@@ -413,7 +438,7 @@ function LoadingRowCells() {
       <td data-slot="table-cell" className="w-0 px-4 py-4 align-middle">
         <div className="space-y-2" aria-hidden="true">
           <div className="h-4 w-48 rounded bg-muted/60" />
-          <div className="h-3 w-72 rounded bg-muted/40" />
+          <div className="h-3 w-32 rounded bg-muted/40" />
         </div>
       </td>
       <td
@@ -423,6 +448,9 @@ function LoadingRowCells() {
         <div className="ml-auto h-4 w-12 rounded bg-muted/50" aria-hidden="true" />
       </td>
       <td data-slot="table-cell" className="px-4 py-4 align-middle">
+        <div className="h-4 w-24 rounded bg-muted/40" aria-hidden="true" />
+      </td>
+      <td data-slot="table-cell" className="px-4 py-4 align-middle">
         <div className="flex flex-wrap gap-2" aria-hidden="true">
           <div className="h-6 w-16 rounded-full bg-muted/50" />
           <div className="h-6 w-20 rounded-full bg-muted/40" />
@@ -430,5 +458,44 @@ function LoadingRowCells() {
         </div>
       </td>
     </>
+  )
+}
+
+function MetadataLink({
+  href,
+  icon,
+  label,
+  monospace = false,
+}: {
+  href: string
+  icon?: ReactNode
+  label: string
+  monospace?: boolean
+}) {
+  return (
+    <a
+      className={`inline-flex items-center gap-1.5 underline decoration-border/80 underline-offset-4 transition-colors hover:text-foreground ${
+        monospace ? "font-mono" : ""
+      }`}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {icon}
+      <span>{label}</span>
+    </a>
+  )
+}
+
+function NpmIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M2.5 3.5h19v17h-19v-17Zm3 3v8h4v-5h2v5h2v-5h2v5h3v-8h-13Z" />
+    </svg>
   )
 }

@@ -1,4 +1,5 @@
 import {
+  backfillLastPublishedAtFromRawEcosystems,
   pruneEcosystemsPackages,
   syncEcosystemsPopular,
 } from "../../server/catalog/admin-service"
@@ -105,7 +106,9 @@ describe("ecosyste.ms popular sync", () => {
             package_key,
             repository_name,
             description,
+            homepage_url,
             primary_url,
+            last_published_at,
             stars,
             downloads,
             downloads_period,
@@ -130,7 +133,9 @@ describe("ecosyste.ms popular sync", () => {
         package_key: "npm:semver",
         repository_name: "npm/node-semver",
         description: "The semantic version parser used by npm.",
+        homepage_url: "https://github.com/npm/node-semver#readme",
         primary_url: "https://github.com/npm/node-semver#readme",
+        last_published_at: "2026-01-01T00:00:00.000Z",
         stars: 5410,
         downloads: 99000,
         downloads_period: "last-month",
@@ -184,7 +189,7 @@ describe("ecosyste.ms popular sync", () => {
 
       const packageRows = await database.client.execute({
         sql: `
-          SELECT repository_name, primary_url, stars, downloads, dependent_packages_count
+          SELECT repository_name, homepage_url, primary_url, last_published_at, stars, downloads, dependent_packages_count
           FROM packages
           WHERE package_key = ?
         `,
@@ -202,7 +207,9 @@ describe("ecosyste.ms popular sync", () => {
       expect(packageRows.rows).toHaveLength(1)
       expect(packageRows.rows[0]).toMatchObject({
         repository_name: "debug-js/debug",
+        homepage_url: null,
         primary_url: "https://www.npmjs.com/package/debug",
+        last_published_at: "2026-01-01T00:00:00.000Z",
         stars: null,
         downloads: 123456,
         dependent_packages_count: 789,
@@ -271,6 +278,61 @@ describe("ecosyste.ms popular sync", () => {
       expect(packageRows.rows.map((row) => String(row.package_key))).toEqual([
         "npm:fresh-package",
       ])
+    } finally {
+      await database.cleanup()
+    }
+  })
+
+  it("backfills last_published_at from raw ecosyste.ms blobs", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        sourceType: "npm",
+        sourceName: "react",
+        displayName: "React",
+        publishedAt: null,
+      })
+      await database.client.execute({
+        sql: `
+          INSERT INTO raw_ecosystems_packages (
+            package_key,
+            source_type,
+            source_name,
+            downloads,
+            downloads_period,
+            dependent_packages_count,
+            raw_json,
+            fetched_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          "npm:react",
+          "npm",
+          "react",
+          1000,
+          "last-month",
+          500,
+          JSON.stringify({
+            name: "react",
+            latest_release_published_at: "2026-02-14T12:00:00.000Z",
+          }),
+          "2026-04-03T00:00:00.000Z",
+        ],
+      })
+
+      const result = await backfillLastPublishedAtFromRawEcosystems(database.client)
+      const packageRow = await database.client.execute({
+        sql: `
+          SELECT last_published_at
+          FROM packages
+          WHERE package_key = ?
+        `,
+        args: ["npm:react"],
+      })
+
+      expect(result).toEqual({ packageCount: 1, updatedCount: 1 })
+      expect(packageRow.rows[0]?.last_published_at).toBe("2026-02-14T12:00:00.000Z")
     } finally {
       await database.cleanup()
     }
@@ -521,7 +583,7 @@ describe("ecosyste.ms popular sync", () => {
         now: new Date("2026-04-03T00:00:00.000Z"),
       })
 
-      expect(result).toEqual({ deletedCount: 3 })
+      expect(result).toEqual({ deletedCount: 2 })
 
       const packageRows = await database.client.execute({
         sql: `SELECT package_key FROM packages ORDER BY package_key ASC`,
@@ -533,10 +595,12 @@ describe("ecosyste.ms popular sync", () => {
       expect(packageRows.rows.map((row) => String(row.package_key))).toEqual([
         "github:keep-repo",
         "npm:keep-me",
+        "npm:no-raw-package",
       ])
       expect(tagRows.rows.map((row) => String(row.tag_id))).toEqual([
         "github-tag",
         "keep-tag",
+        "missing-raw-tag",
       ])
     } finally {
       await database.cleanup()

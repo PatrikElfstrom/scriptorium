@@ -1,6 +1,6 @@
 export const DEFAULT_CATALOG_SEARCH_LIMIT = 30
 export const MAX_CATALOG_SEARCH_LIMIT = 1000
-export const CATALOG_SORT_COLUMNS = ["name", "stars", "tags"] as const
+export const CATALOG_SORT_COLUMNS = ["name", "stars", "published", "tags"] as const
 export const CATALOG_SORT_DIRECTIONS = ["asc", "desc"] as const
 
 export type CatalogSortColumn = (typeof CATALOG_SORT_COLUMNS)[number]
@@ -12,9 +12,11 @@ export type CatalogItem = {
   sourceName: string
   name: string
   description: string | null
+  homepageUrl: string | null
   url: string | null
   repositoryName: string | null
   npmPackageName: string | null
+  publishedAt: string | null
   stars: number | null
   downloads: number
   downloadsPeriod: string | null

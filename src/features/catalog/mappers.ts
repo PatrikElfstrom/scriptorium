@@ -6,7 +6,8 @@ export function mapCatalogItemsToRows(items: CatalogItem[]): CatalogRow[] {
     id: item.packageKey,
     name: item.name,
     description: normalizeOptionalString(item.description),
-    url: normalizeOptionalString(item.url),
+    homepageUrl: normalizeOptionalString(item.homepageUrl),
+    url: normalizeOptionalString(item.homepageUrl ?? item.url),
     repositoryName: normalizeOptionalString(item.repositoryName),
     github: item.repositoryName
       ? `https://github.com/${item.repositoryName}`
@@ -18,6 +19,7 @@ export function mapCatalogItemsToRows(items: CatalogItem[]): CatalogRow[] {
           .map(encodeURIComponent)
           .join("/")}`
       : undefined,
+    publishedAt: normalizeOptionalString(item.publishedAt),
     stars: typeof item.stars === "number" ? item.stars : undefined,
     tags: uniqueValues(
       item.tags

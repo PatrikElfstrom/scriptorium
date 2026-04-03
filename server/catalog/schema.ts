@@ -23,9 +23,11 @@ const schemaStatements: InStatement[] = [
       display_name TEXT NOT NULL,
       search_name TEXT NOT NULL,
       description TEXT,
+      homepage_url TEXT,
       primary_url TEXT NOT NULL,
       repository_name TEXT,
       npm_package_name TEXT,
+      last_published_at TEXT,
       stars INTEGER,
       downloads INTEGER NOT NULL,
       downloads_period TEXT,
@@ -111,6 +113,9 @@ export async function ensureCatalogSchema(client: CatalogDatabaseClient) {
   for (const statement of schemaStatements) {
     await client.execute(statement)
   }
+
+  await ensurePackagesColumn(client, "homepage_url", "TEXT")
+  await ensurePackagesColumn(client, "last_published_at", "TEXT")
 }
 
 export async function resetCatalogSchema(client: CatalogDatabaseClient) {
@@ -119,4 +124,19 @@ export async function resetCatalogSchema(client: CatalogDatabaseClient) {
   }
 
   await ensureCatalogSchema(client)
+}
+
+async function ensurePackagesColumn(
+  client: CatalogDatabaseClient,
+  columnName: string,
+  columnType: string
+) {
+  const result = await client.execute("PRAGMA table_info(packages)")
+  const existingColumns = new Set(result.rows.map((row) => String(row.name)))
+
+  if (existingColumns.has(columnName)) {
+    return
+  }
+
+  await client.execute(`ALTER TABLE packages ADD COLUMN ${columnName} ${columnType}`)
 }

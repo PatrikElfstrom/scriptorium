@@ -62,10 +62,8 @@ The public read API is:
 
 ## Admin sync commands
 
-- `pnpm import:algolia-packages -- "react framework"`
 - `pnpm sync:ecosystems-popular`
-- `pnpm sync:npm-metadata`
-- `pnpm sync:github-metadata`
+- `pnpm prune:ecosystems-packages`
 
 These commands update the database directly. They do not generate repo data files or commit changes.
 
@@ -84,10 +82,7 @@ pnpm build:worker
 - `VITE_API_BASE_URL`: frontend API origin override for local or split-origin deployments
 - `TURSO_DATABASE_URL`: Turso/libSQL database URL for the worker and sync scripts
 - `TURSO_AUTH_TOKEN`: Turso auth token when using remote Turso
-- `GITHUB_TOKEN`: optional GitHub API token for GitHub metadata sync
 - `ECOSYSTEMS_BASE_URL`: optional ecosyste.ms API override, defaults to `https://packages.ecosyste.ms/api/v1`
 - `ECOSYSTEMS_SYNC_LIMIT`: optional total number of ecosyste.ms npm packages to sync, defaults to `1000`
-- `GITHUB_API_BASE_URL`: optional GitHub API override, defaults to `https://api.github.com`
-- `NPM_REGISTRY_BASE_URL`: optional npm registry override, defaults to `https://registry.npmjs.org`
 - `SCRIPTORIUM_USER_AGENT`: optional user agent for ecosyste.ms sync
 - `SCRIPTORIUM_DATA_DIR`: optional local fallback database directory

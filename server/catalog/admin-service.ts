@@ -4,79 +4,8 @@ import {
   createPrimaryUrl,
   createReplacePackageTagsStatements,
   createUpsertPackageStatement,
-  replacePackageTags,
-  upsertPackage,
   type CatalogPackageRecord,
 } from "./package-store"
-
-export async function importAlgoliaPackages(
-  client: CatalogDatabaseClient,
-  options: ImportAlgoliaPackagesOptions
-) {
-  const existingCatalogRows = await fetchExistingCatalogRows(client)
-  const existingPackageNames = new Set<string>()
-  const existingNames = new Set<string>()
-  const existingRepositoryNames = new Set<string>()
-
-  for (const row of existingCatalogRows) {
-    if (row.display_name) {
-      existingNames.add(normalizeValue(String(row.display_name)))
-    }
-
-    if (row.npm_package_name) {
-      existingPackageNames.add(normalizeValue(String(row.npm_package_name)))
-    }
-
-    if (row.repository_name) {
-      existingRepositoryNames.add(normalizeValue(String(row.repository_name)))
-    }
-  }
-
-  const packagesByName = new Map<string, AlgoliaHit>()
-
-  for (const query of options.queries) {
-    const hits = await fetchAlgoliaHits(query, options)
-
-    for (const hit of hits) {
-      if (!shouldImportHit(hit, options)) {
-        continue
-      }
-
-      const existingMatch =
-        existingPackageNames.has(normalizeValue(hit.name)) ||
-        existingNames.has(normalizeValue(hit.name)) ||
-        (hit.repositoryName &&
-          existingRepositoryNames.has(normalizeValue(hit.repositoryName)))
-
-      if (existingMatch || packagesByName.has(hit.name)) {
-        continue
-      }
-
-      packagesByName.set(hit.name, hit)
-    }
-  }
-
-  const selectedHits = Array.from(packagesByName.values())
-    .sort(compareAlgoliaHits)
-    .slice(0, options.maxImports)
-
-  if (selectedHits.length === 0) {
-    return { importedCount: 0 }
-  }
-
-  const syncedAt = new Date().toISOString()
-
-  for (const hit of selectedHits) {
-    const packageRecord = createImportedNpmPackageRecord(hit, syncedAt)
-
-    await upsertPackage(client, packageRecord)
-    await replacePackageTags(client, packageRecord.packageKey, "algolia", hit.keywords)
-  }
-
-  return {
-    importedCount: selectedHits.length,
-  }
-}
 
 export async function syncEcosystemsPopular(
   client: CatalogDatabaseClient,
@@ -139,127 +68,6 @@ export async function syncEcosystemsPopular(
   }
 }
 
-export async function syncNpmMetadata(
-  client: CatalogDatabaseClient,
-  options: SyncNpmMetadataOptions
-) {
-  const catalogRows = await client.execute(`
-    SELECT package_key, npm_package_name
-    FROM packages
-    WHERE is_active = 1 AND npm_package_name IS NOT NULL AND npm_package_name <> ''
-  `)
-  const packageNames = Array.from(
-    new Set(
-      catalogRows.rows
-        .map((row) => normalizeOptionalString(row.npm_package_name))
-        .filter((value): value is string => Boolean(value))
-    )
-  )
-
-  const metadataByPackageName = await fetchPackageMetadata(packageNames, options)
-  let updatedProjectCount = 0
-
-  for (const row of catalogRows.rows) {
-    const packageName = normalizeOptionalString(row.npm_package_name)
-
-    if (!packageName) {
-      continue
-    }
-
-    const metadata = metadataByPackageName.get(packageName)
-
-    if (!metadata) {
-      continue
-    }
-
-    await client.execute({
-      sql: `
-        UPDATE packages
-        SET
-          npm_package_name = ?,
-          description = ?,
-          primary_url = CASE
-            WHEN primary_url IS NULL OR primary_url = '' THEN ?
-            ELSE primary_url
-          END,
-          repository_name = COALESCE(repository_name, ?),
-          npm_synced_at = ?
-        WHERE package_key = ?
-      `,
-      args: [
-        packageName,
-        metadata.description,
-        metadata.homepage ?? metadata.npmPackageUrl,
-        metadata.repositoryName ?? null,
-        metadata.syncedAt,
-        row.package_key,
-      ],
-    })
-
-    await replacePackageTags(client, String(row.package_key), "npm", metadata.keywords)
-    updatedProjectCount += 1
-  }
-
-  return {
-    updatedCount: updatedProjectCount,
-    packageCount: packageNames.length,
-  }
-}
-
-export async function syncGitHubMetadata(
-  client: CatalogDatabaseClient,
-  options: SyncGitHubMetadataOptions
-) {
-  const catalogRows = await client.execute(`
-    SELECT package_key, repository_name
-    FROM packages
-    WHERE is_active = 1 AND repository_name IS NOT NULL AND repository_name <> ''
-  `)
-  const repositoryNames = Array.from(
-    new Set(
-      catalogRows.rows
-        .map((row) => normalizeOptionalString(row.repository_name))
-        .filter((value): value is string => Boolean(value))
-    )
-  )
-
-  const metadataByRepository = await fetchRepositoryMetadata(repositoryNames, options)
-  let updatedProjectCount = 0
-
-  for (const row of catalogRows.rows) {
-    const repositoryName = normalizeOptionalString(row.repository_name)
-
-    if (!repositoryName) {
-      continue
-    }
-
-    const metadata = metadataByRepository.get(repositoryName)
-
-    if (!metadata) {
-      continue
-    }
-
-    await client.execute({
-      sql: `
-        UPDATE packages
-        SET
-          stars = ?,
-          github_synced_at = ?
-        WHERE package_key = ?
-      `,
-      args: [metadata.stars, metadata.syncedAt, row.package_key],
-    })
-
-    await replacePackageTags(client, String(row.package_key), "github", metadata.topics)
-    updatedProjectCount += 1
-  }
-
-  return {
-    updatedCount: updatedProjectCount,
-    repositoryCount: repositoryNames.length,
-  }
-}
-
 export async function pruneEcosystemsPackages(
   client: CatalogDatabaseClient,
   options: PruneEcosystemsPackagesOptions = {}
@@ -267,7 +75,7 @@ export async function pruneEcosystemsPackages(
   const result = await client.execute(`
     SELECT p.package_key, rep.raw_json
     FROM packages p
-    LEFT JOIN raw_ecosystems_packages rep ON rep.package_key = p.package_key
+    JOIN raw_ecosystems_packages rep ON rep.package_key = p.package_key
     WHERE p.source_type = 'npm'
   `)
 
@@ -306,15 +114,42 @@ export async function pruneEcosystemsPackages(
   }
 }
 
-export type ImportAlgoliaPackagesOptions = {
-  queries: string[]
-  algoliaAppId: string
-  algoliaApiKey: string
-  algoliaIndexName: string
-  hitsPerQuery: number
-  maxImports: number
-  minDownloadsLast30Days: number
-  modernWithinDays: number
+export async function backfillLastPublishedAtFromRawEcosystems(
+  client: CatalogDatabaseClient
+) {
+  const result = await client.execute(`
+    SELECT p.package_key, p.last_published_at, rep.raw_json
+    FROM packages p
+    JOIN raw_ecosystems_packages rep ON rep.package_key = p.package_key
+    WHERE p.source_type = 'npm'
+  `)
+
+  let updatedCount = 0
+
+  for (const row of result.rows) {
+    const nextPublishedAt = extractLastPublishedAtFromRawJson(row.raw_json)
+    const currentPublishedAt = normalizeOptionalString(row.last_published_at)
+
+    if (!nextPublishedAt || nextPublishedAt === currentPublishedAt) {
+      continue
+    }
+
+    await client.execute({
+      sql: `
+        UPDATE packages
+        SET last_published_at = ?
+        WHERE package_key = ?
+      `,
+      args: [nextPublishedAt, row.package_key],
+    })
+
+    updatedCount += 1
+  }
+
+  return {
+    packageCount: result.rows.length,
+    updatedCount,
+  }
 }
 
 export type SyncEcosystemsPopularOptions = {
@@ -326,38 +161,17 @@ export type SyncEcosystemsPopularOptions = {
   userAgent: string
 }
 
-export type SyncNpmMetadataOptions = {
-  npmRegistryBaseUrl: string
-}
-
-export type SyncGitHubMetadataOptions = {
-  githubApiBaseUrl: string
-  githubToken?: string
-}
-
 export type PruneEcosystemsPackagesOptions = {
   now?: Date
-}
-
-type AlgoliaHit = {
-  name: string
-  description: string
-  homepage?: string
-  repositoryName?: string
-  keywords: string[]
-  popular: boolean
-  downloadsLast30Days: number
-  modified?: Date
-  isDeprecated: boolean
-  badPackage: boolean
-  isSecurityHeld: boolean
 }
 
 type EcosystemsPackage = {
   name: string
   description: string | undefined
+  homepageUrl: string | undefined
   primaryUrl: string | undefined
   repositoryName: string | undefined
+  publishedAt: Date | null
   stars: number | null
   downloads: number
   downloadsPeriod: string | null
@@ -365,31 +179,6 @@ type EcosystemsPackage = {
   npmTags: string[]
   githubTags: string[]
   rawJson: string
-}
-
-function createImportedNpmPackageRecord(
-  hit: AlgoliaHit,
-  syncedAt: string
-): CatalogPackageRecord {
-  return {
-    packageKey: createPackageKey("npm", hit.name),
-    sourceType: "npm",
-    sourceName: hit.name,
-    displayName: hit.name,
-    searchName: hit.name.trim().toLowerCase(),
-    description: hit.description,
-    primaryUrl: hit.homepage ?? createPrimaryUrl("npm", hit.name),
-    repositoryName: hit.repositoryName ?? null,
-    npmPackageName: hit.name,
-    stars: null,
-    downloads: 0,
-    downloadsPeriod: null,
-    dependentPackagesCount: 0,
-    rawEcosystemsFetchedAt: syncedAt,
-    npmSyncedAt: syncedAt,
-    githubSyncedAt: null,
-    isActive: 1,
-  }
 }
 
 function createEcosystemsPackageRecord(
@@ -403,10 +192,12 @@ function createEcosystemsPackageRecord(
     displayName: ecosystemPackage.name,
     searchName: ecosystemPackage.name.trim().toLowerCase(),
     description: ecosystemPackage.description ?? null,
+    homepageUrl: ecosystemPackage.homepageUrl ?? null,
     primaryUrl:
       ecosystemPackage.primaryUrl ?? createPrimaryUrl("npm", ecosystemPackage.name),
     repositoryName: ecosystemPackage.repositoryName ?? null,
     npmPackageName: ecosystemPackage.name,
+    publishedAt: ecosystemPackage.publishedAt?.toISOString() ?? null,
     stars: ecosystemPackage.stars,
     downloads: ecosystemPackage.downloads,
     downloadsPeriod: ecosystemPackage.downloadsPeriod,
@@ -416,131 +207,6 @@ function createEcosystemsPackageRecord(
     githubSyncedAt: null,
     isActive: 1,
   }
-}
-
-async function fetchExistingCatalogRows(client: CatalogDatabaseClient) {
-  const result = await client.execute(`
-    SELECT display_name, npm_package_name, repository_name
-    FROM packages
-    WHERE is_active = 1
-  `)
-
-  return result.rows
-}
-
-async function fetchAlgoliaHits(
-  query: string,
-  options: ImportAlgoliaPackagesOptions
-) {
-  const response = await fetch(
-    `https://${options.algoliaAppId}-dsn.algolia.net/1/indexes/${encodeURIComponent(
-      options.algoliaIndexName
-    )}/query`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-algolia-api-key": options.algoliaApiKey,
-        "x-algolia-application-id": options.algoliaAppId,
-      },
-      body: JSON.stringify({
-        query,
-        hitsPerPage: options.hitsPerQuery,
-        attributesToRetrieve: [
-          "name",
-          "description",
-          "homepage",
-          "repository",
-          "keywords",
-          "popular",
-          "downloadsLast30Days",
-          "modified",
-          "deprecated",
-          "isDeprecated",
-          "badPackage",
-          "isSecurityHeld",
-        ],
-      }),
-    }
-  )
-
-  if (!response.ok) {
-    const details = await response.text()
-    throw new Error(
-      `Failed to query Algolia for "${query}": ${response.status} ${response.statusText}\n${details}`
-    )
-  }
-
-  const payload = await response.json()
-
-  if (!Array.isArray(payload.hits)) {
-    throw new Error(`Algolia response for "${query}" did not include hits.`)
-  }
-
-  return payload.hits
-    .map((hit: unknown) => mapAlgoliaHit(hit))
-    .filter((hit: AlgoliaHit | undefined): hit is AlgoliaHit => Boolean(hit))
-}
-
-function mapAlgoliaHit(hit: unknown) {
-  if (!hit || typeof hit !== "object") {
-    return undefined
-  }
-
-  const candidate = hit as Record<string, unknown>
-  const name = normalizeOptionalString(candidate.name)
-  const description = normalizeOptionalString(candidate.description)
-
-  if (!name || !description) {
-    return undefined
-  }
-
-  return {
-    name,
-    description,
-    homepage: normalizeUrl(candidate.homepage),
-    repositoryName: extractGitHubRepositoryName(candidate.repository),
-    keywords: normalizeStringArray(candidate.keywords),
-    popular: candidate.popular === true,
-    downloadsLast30Days: normalizeInteger(candidate.downloadsLast30Days),
-    modified: normalizeModifiedTimestamp(candidate.modified),
-    isDeprecated: Boolean(candidate.isDeprecated || candidate.deprecated),
-    badPackage: candidate.badPackage === true,
-    isSecurityHeld: candidate.isSecurityHeld === true,
-  }
-}
-
-function shouldImportHit(
-  hit: AlgoliaHit,
-  options: ImportAlgoliaPackagesOptions
-) {
-  if (hit.isDeprecated || hit.badPackage || hit.isSecurityHeld) {
-    return false
-  }
-
-  if (!hit.popular) {
-    return false
-  }
-
-  if (hit.downloadsLast30Days < options.minDownloadsLast30Days) {
-    return false
-  }
-
-  if (!hit.modified) {
-    return false
-  }
-
-  const modernCutoff = new Date()
-  modernCutoff.setUTCDate(modernCutoff.getUTCDate() - options.modernWithinDays)
-
-  return hit.modified >= modernCutoff
-}
-
-function compareAlgoliaHits(left: AlgoliaHit, right: AlgoliaHit) {
-  return (
-    right.downloadsLast30Days - left.downloadsLast30Days ||
-    left.name.localeCompare(right.name)
-  )
 }
 
 async function fetchEcosystemsPopularPackages(options: SyncEcosystemsPopularOptions) {
@@ -634,11 +300,13 @@ function normalizeEcosystemsPackage(entry: unknown) {
   return {
     name,
     description: normalizeOptionalString(candidate.description),
+    homepageUrl: normalizeUrl(candidate.homepage) ?? undefined,
     primaryUrl:
       normalizeUrl(candidate.homepage) ??
       normalizeUrl(candidate.registry_url) ??
       undefined,
     repositoryName,
+    publishedAt: latestReleasePublishedAt ?? null,
     stars: normalizeNullableInteger(repoMetadata?.stargazers_count),
     downloads: normalizeInteger(candidate.downloads),
     downloadsPeriod: normalizeOptionalString(candidate.downloads_period) ?? null,
@@ -685,179 +353,6 @@ function createUpsertRawEcosystemsPackageStatement(
   }
 }
 
-async function fetchPackageMetadata(
-  packageNames: string[],
-  options: SyncNpmMetadataOptions
-) {
-  const metadataByPackageName = new Map<string, NpmPackageMetadata>()
-  const batchSize = 8
-
-  for (let index = 0; index < packageNames.length; index += batchSize) {
-    const batch = packageNames.slice(index, index + batchSize)
-    const entries = await Promise.all(
-      batch.map(async (packageName) => [
-        packageName,
-        await fetchSinglePackageMetadata(packageName, options.npmRegistryBaseUrl),
-      ] as const)
-    )
-
-    for (const [packageName, metadata] of entries) {
-      metadataByPackageName.set(packageName, metadata)
-    }
-  }
-
-  return metadataByPackageName
-}
-
-type NpmPackageMetadata = {
-  description: string
-  homepage?: string
-  keywords: string[]
-  npmPackageUrl: string
-  repositoryName?: string
-  syncedAt: string
-}
-
-type PackageManifestLike = {
-  keywords?: unknown
-  repository?: unknown
-  description?: unknown
-  homepage?: unknown
-}
-
-type NpmPackument = PackageManifestLike & {
-  "dist-tags"?: {
-    latest?: unknown
-  }
-  versions?: Record<string, unknown>
-}
-
-async function fetchSinglePackageMetadata(
-  packageName: string,
-  npmRegistryBaseUrl: string
-): Promise<NpmPackageMetadata> {
-  const packageUrl = `${npmRegistryBaseUrl}/${encodeURIComponent(packageName)}`
-  const response = await fetch(packageUrl, {
-    headers: {
-      Accept: "application/json",
-    },
-  })
-
-  if (!response.ok) {
-    const details = await response.text()
-    throw new Error(
-      `Failed to fetch ${packageName}: ${response.status} ${response.statusText}\n${details}`
-    )
-  }
-
-  const packument = await response.json()
-  const latestVersion = resolveLatestVersion(packument)
-  const description = normalizeOptionalString(
-    latestVersion?.description ?? packument?.description
-  )
-
-  if (!description) {
-    throw new Error(`npm response for ${packageName} is missing description.`)
-  }
-
-  return {
-    description,
-    homepage: normalizeOptionalString(latestVersion?.homepage ?? packument?.homepage),
-    keywords: normalizeStringArray(latestVersion?.keywords ?? packument?.keywords),
-    npmPackageUrl: createPrimaryUrl("npm", packageName) ?? "",
-    repositoryName: extractGitHubRepositoryName(
-      latestVersion?.repository ?? packument?.repository
-    ),
-    syncedAt: new Date().toISOString(),
-  }
-}
-
-async function fetchRepositoryMetadata(
-  repositoryNames: string[],
-  options: SyncGitHubMetadataOptions
-) {
-  const metadataByRepository = new Map<string, GitHubMetadata>()
-  const batchSize = 8
-
-  for (let index = 0; index < repositoryNames.length; index += batchSize) {
-    const batch = repositoryNames.slice(index, index + batchSize)
-    const entries = await Promise.all(
-      batch.map(async (repositoryName) => [
-        repositoryName,
-        await fetchSingleRepositoryMetadata(repositoryName, options),
-      ] as const)
-    )
-
-    for (const [repositoryName, metadata] of entries) {
-      if (metadata) {
-        metadataByRepository.set(repositoryName, metadata)
-      }
-    }
-  }
-
-  return metadataByRepository
-}
-
-type GitHubMetadata = {
-  stars: number
-  topics: string[]
-  syncedAt: string
-}
-
-async function fetchSingleRepositoryMetadata(
-  repositoryName: string,
-  options: SyncGitHubMetadataOptions
-): Promise<GitHubMetadata | undefined> {
-  const response = await fetch(`${options.githubApiBaseUrl}/repos/${repositoryName}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      ...(options.githubToken
-        ? {
-            Authorization: `Bearer ${options.githubToken}`,
-          }
-        : {}),
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  })
-
-  if (response.status === 404) {
-    return undefined
-  }
-
-  if (!response.ok) {
-    const details = await response.text()
-    throw new Error(
-      `Failed to fetch ${repositoryName}: ${response.status} ${response.statusText}\n${details}`
-    )
-  }
-
-  const repository = await response.json()
-
-  if (!Number.isInteger(repository.stargazers_count)) {
-    throw new Error(`GitHub response for ${repositoryName} is missing stars.`)
-  }
-
-  return {
-    stars: repository.stargazers_count,
-    topics: normalizeStringArray(repository.topics),
-    syncedAt: new Date().toISOString(),
-  }
-}
-
-function resolveLatestVersion(packument: NpmPackument) {
-  const latestTag =
-    typeof packument["dist-tags"]?.latest === "string"
-      ? packument["dist-tags"].latest
-      : undefined
-  const candidate = latestTag ? packument.versions?.[latestTag] : undefined
-
-  if (!candidate || typeof candidate !== "object") {
-    return undefined
-  }
-
-  return candidate as PackageManifestLike
-}
-
 function normalizeOptionalString(value: unknown) {
   if (typeof value !== "string") {
     return undefined
@@ -889,7 +384,7 @@ function normalizeUrl(value: unknown) {
     : undefined
 }
 
-function normalizeModifiedTimestamp(value: unknown) {
+function normalizeTimestamp(value: unknown) {
   if (typeof value !== "string") {
     return undefined
   }
@@ -898,13 +393,17 @@ function normalizeModifiedTimestamp(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed
 }
 
-function normalizeTimestamp(value: unknown) {
-  if (typeof value !== "string") {
+function extractLastPublishedAtFromRawJson(rawJson: unknown) {
+  if (typeof rawJson !== "string") {
     return undefined
   }
 
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  try {
+    const parsed = JSON.parse(rawJson) as Record<string, unknown>
+    return normalizeTimestamp(parsed.latest_release_published_at)?.toISOString()
+  } catch {
+    return undefined
+  }
 }
 
 function isRecentRelease(value?: Date, now = new Date()) {
@@ -965,10 +464,6 @@ function normalizeInteger(value: unknown) {
 
 function normalizeNullableInteger(value: unknown) {
   return Number.isFinite(value) ? Math.trunc(value as number) : null
-}
-
-function normalizeValue(value: string) {
-  return value.trim().toLowerCase()
 }
 
 function extractGitHubRepositoryName(repository: unknown) {
