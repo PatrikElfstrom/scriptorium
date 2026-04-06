@@ -214,6 +214,73 @@ describe("CatalogPage", () => {
     ).toBe(true)
   })
 
+  it("truncates long GitHub repository labels and keeps the full name in the tooltip", async () => {
+    const longRepositoryName = `example/${"very-long-segment-".repeat(12)}repo`
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((request: RequestInfo | URL) => {
+        const url = new URL(String(request), "https://example.com")
+
+        if (url.pathname === "/api/search") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                items: [
+                  {
+                    packageKey: "npm:long-repo",
+                    sourceType: "npm",
+                    sourceName: "long-repo",
+                    name: "Long Repo Tool",
+                    description: null,
+                    homepageUrl: null,
+                    url: "https://example.com/long-repo",
+                    repositoryName: longRepositoryName,
+                    npmPackageName: "long-repo",
+                    publishedAt: "2026-01-01T00:00:00.000Z",
+                    stars: 42,
+                    downloads: 10,
+                    downloadsPeriod: "last-month",
+                    dependentPackagesCount: 1,
+                    tags: ["framework"],
+                  },
+                ],
+                nextCursor: null,
+                totalApprox: 1,
+              }),
+              {
+                status: 200,
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              }
+            )
+          )
+        }
+
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [],
+            }),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          )
+        )
+      })
+    )
+
+    renderCatalogPage()
+
+    const link = await screen.findByRole("link", { name: longRepositoryName })
+    expect(link.getAttribute("title")).toBe(longRepositoryName)
+    expect(link.textContent).toHaveLength(200)
+    expect(link.textContent?.endsWith("...")).toBe(true)
+  })
+
   it("loads the next page when scrolling near the end of the virtualized list", async () => {
     const fetchMock = vi.fn(createSuccessFetch)
     vi.stubGlobal("fetch", fetchMock)

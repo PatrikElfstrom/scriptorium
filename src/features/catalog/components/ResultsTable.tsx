@@ -95,7 +95,12 @@ export function ResultsTable({
                 {tool.github ? (
                   <MetadataLink
                     href={tool.github}
-                    label={tool.repositoryName ?? "github"}
+                    label={truncateLabel(
+                      tool.repositoryName ?? "github",
+                      GITHUB_REPOSITORY_LABEL_MAX_LENGTH
+                    )}
+                    title={tool.repositoryName ?? "github"}
+                    ariaLabel={tool.repositoryName ?? "github"}
                     icon={<GitHubIcon className="size-3.5" />}
                     monospace
                   />
@@ -404,6 +409,7 @@ export function ResultsTable({
 
 const LOAD_AHEAD_ROWS = 12
 const ESTIMATED_ROW_HEIGHT = 68
+const GITHUB_REPOSITORY_LABEL_MAX_LENGTH = 200
 
 function TableMessage({
   message,
@@ -462,29 +468,43 @@ function LoadingRowCells() {
 }
 
 function MetadataLink({
+  ariaLabel,
   href,
   icon,
   label,
   monospace = false,
+  title,
 }: {
+  ariaLabel?: string
   href: string
   icon?: ReactNode
   label: string
   monospace?: boolean
+  title?: string
 }) {
   return (
     <a
+      aria-label={ariaLabel}
       className={`inline-flex items-center gap-1.5 underline decoration-border/80 underline-offset-4 transition-colors hover:text-foreground ${
         monospace ? "font-mono" : ""
       }`}
       href={href}
       target="_blank"
       rel="noreferrer"
+      title={title}
     >
       {icon}
       <span>{label}</span>
     </a>
   )
+}
+
+function truncateLabel(value: string, maxLength: number) {
+  if (value.length <= maxLength) {
+    return value
+  }
+
+  return `${value.slice(0, Math.max(0, maxLength - 3))}...`
 }
 
 function NpmIcon({ className }: { className?: string }) {
