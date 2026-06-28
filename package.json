@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
-    "check:push": "pnpm format:check && pnpm lint && pnpm test && pnpm build",
     "dev": "vite",
     "db:prepare": "tsx ./scripts/prepare-catalog-database.ts",
     "db:reset": "tsx ./scripts/reset-catalog-database.ts",
@@ -16,13 +15,13 @@
     "build:worker": "wrangler deploy --dry-run --outdir dist-worker",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format:check": "prettier --check \"**/*.{ts,tsx}\"",
-    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "format": "prettier --check \"**/*.{ts,tsx}\"",
+    "format:fix": "prettier --write \"**/*.{ts,tsx}\"",
     "sync:npm-catalog": "tsx ./scripts/sync-npm-catalog.ts",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "verify": "pnpm lint && pnpm test && pnpm build",
-    "verify:fix": "pnpm lint:fix && pnpm format && pnpm verify",
+    "verify": "pnpm format && pnpm lint && pnpm test && pnpm build",
+    "verify:fix": "pnpm lint:fix && pnpm format:fix && pnpm verify",
     "preview": "vite preview"
   },
   "dependencies": {

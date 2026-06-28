@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { tmpdir } from "node:os"
 import { readFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { promisify } from "node:util"
@@ -1122,12 +1123,13 @@ function shouldValidatePackageWithNpmView(input: {
   return input.repositoryUrl == null || input.packageLastPublishedAt == null
 }
 
-async function resolvePackageWithNpmView(packageName: string) {
+export async function resolvePackageWithNpmView(packageName: string) {
   try {
     await execFileAsync(
       "npm",
       ["view", packageName, "name", "version", "--json"],
       {
+        cwd: tmpdir(),
         timeout: NPM_VIEW_TIMEOUT_MS,
       }
     )
