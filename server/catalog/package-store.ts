@@ -4,6 +4,10 @@ import type { CatalogDatabaseClient } from "./database"
 import { createVisiblePackageSql } from "./package-removal"
 import { createTagLabel, normalizeTagValue } from "./tag-normalization"
 
+export const DERIVED_CATALOG_DIRTY_TABLE = "catalog_derived_dirty"
+export const DERIVED_CATALOG_DIRTY_ACTIVE_STATUS = "active"
+export const DERIVED_CATALOG_DIRTY_FAILED_STATUS = "failed"
+
 export type CatalogPackageRecord = {
   packageName: string
   repositoryUrl: string | null
@@ -258,6 +262,141 @@ export function createRebuildTagStatsStatements(): InStatement[] {
     },
     ...createBumpTagsVersionStatements(),
   ]
+}
+
+export function createMarkDerivedCatalogDirtyStatements(
+  syncId: string,
+  markedAt: string
+): InStatement[] {
+  return [
+    {
+      sql: `
+        CREATE TABLE IF NOT EXISTS ${DERIVED_CATALOG_DIRTY_TABLE} (
+          sync_id TEXT PRIMARY KEY,
+          marked_at TEXT NOT NULL,
+          status TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `,
+    },
+    {
+      sql: `
+        INSERT INTO ${DERIVED_CATALOG_DIRTY_TABLE} (
+          sync_id,
+          marked_at,
+          status,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(sync_id) DO UPDATE SET
+          marked_at = excluded.marked_at,
+          status = excluded.status,
+          updated_at = excluded.updated_at
+      `,
+      args: [syncId, markedAt, DERIVED_CATALOG_DIRTY_ACTIVE_STATUS, markedAt],
+    },
+  ]
+}
+
+export function createFailDerivedCatalogDirtyStatements(
+  syncId: string,
+  failedAt: string
+): InStatement[] {
+  return [
+    {
+      sql: `
+        CREATE TABLE IF NOT EXISTS ${DERIVED_CATALOG_DIRTY_TABLE} (
+          sync_id TEXT PRIMARY KEY,
+          marked_at TEXT NOT NULL,
+          status TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `,
+    },
+    {
+      sql: `
+        INSERT INTO ${DERIVED_CATALOG_DIRTY_TABLE} (
+          sync_id,
+          marked_at,
+          status,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(sync_id) DO UPDATE SET
+          status = excluded.status,
+          updated_at = excluded.updated_at
+      `,
+      args: [syncId, failedAt, DERIVED_CATALOG_DIRTY_FAILED_STATUS, failedAt],
+    },
+  ]
+}
+
+export function createClearDerivedCatalogDirtyStatements(
+  syncId: string
+): InStatement[] {
+  return [
+    {
+      sql: `DELETE FROM ${DERIVED_CATALOG_DIRTY_TABLE} WHERE sync_id = ?`,
+      args: [syncId],
+    },
+  ]
+}
+
+export function createClearRepairableDerivedCatalogDirtyStatements(
+  staleActiveMarkedBefore: string
+): InStatement[] {
+  return [
+    {
+      sql: `
+        DELETE FROM ${DERIVED_CATALOG_DIRTY_TABLE}
+        WHERE status = ?
+          OR (
+            status = ?
+            AND marked_at <= ?
+          )
+      `,
+      args: [
+        DERIVED_CATALOG_DIRTY_FAILED_STATUS,
+        DERIVED_CATALOG_DIRTY_ACTIVE_STATUS,
+        staleActiveMarkedBefore,
+      ],
+    },
+  ]
+}
+
+export function createDropDerivedCatalogDirtyTableStatements(): InStatement[] {
+  return [
+    {
+      sql: `DROP TABLE IF EXISTS ${DERIVED_CATALOG_DIRTY_TABLE}`,
+    },
+  ]
+}
+
+export async function dropDerivedCatalogDirtyTableIfEmpty(
+  client: CatalogDatabaseClient
+) {
+  const transaction = await client.transaction("write")
+
+  try {
+    const result = await transaction.execute(`
+      SELECT 1
+      FROM ${DERIVED_CATALOG_DIRTY_TABLE}
+      LIMIT 1
+    `)
+
+    if (result.rows.length === 0) {
+      await transaction.execute(
+        `DROP TABLE IF EXISTS ${DERIVED_CATALOG_DIRTY_TABLE}`
+      )
+    }
+
+    await transaction.commit()
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  } finally {
+    transaction.close()
+  }
 }
 
 export function createRefreshTagStatsStatements(

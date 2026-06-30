@@ -5,6 +5,10 @@ import {
 } from "../../server/catalog/read-service"
 import { ensureCatalogSchema } from "../../server/catalog/schema"
 import {
+  createFailDerivedCatalogDirtyStatements,
+  createMarkDerivedCatalogDirtyStatements,
+} from "../../server/catalog/package-store"
+import {
   createTestCatalogDatabase,
   seedCatalogPackage,
 } from "../helpers/catalog-test-db"
@@ -444,4 +448,299 @@ describe("catalog services", () => {
       await database.cleanup()
     }
   })
+
+  it("does not rebuild derived catalog data during schema ensure when schema is current", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageName: "react",
+        packageDescription: "UI library",
+        packageTags: ["react"],
+      })
+
+      const versionBefore = await readTagsVersion(database.client)
+
+      await ensureCatalogSchema(database.client)
+
+      await expect(readTagsVersion(database.client)).resolves.toBe(
+        versionBefore
+      )
+    } finally {
+      await database.cleanup()
+    }
+  })
+
+  it("does not repair or clear active dirty markers during schema ensure", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageName: "react",
+        packageDescription: "UI library",
+        packageTags: ["react"],
+      })
+
+      await database.client.execute({
+        sql: `
+          UPDATE packages
+          SET package_description = ?
+          WHERE package_name = ?
+        `,
+        args: ["Fast UI runtime", "react"],
+      })
+      await database.client.batch(
+        createMarkDerivedCatalogDirtyStatements(
+          "active-sync-test",
+          new Date().toISOString()
+        ),
+        "write"
+      )
+
+      await ensureCatalogSchema(database.client)
+
+      const searchResult = await searchCatalog(
+        database.client,
+        parseCatalogSearchParams(new URLSearchParams({ q: "runtime" }))
+      )
+      const dirtyMarkers = await readDirtySyncIds(database.client)
+
+      expect(searchResult.items).toEqual([])
+      expect(dirtyMarkers).toEqual(["active-sync-test"])
+    } finally {
+      await database.cleanup()
+    }
+  })
+
+  it("rebuilds failed dirty derived catalog data during schema ensure", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageName: "react",
+        packageDescription: "UI library",
+        packageTags: ["react"],
+      })
+
+      await database.client.execute({
+        sql: `
+          UPDATE packages
+          SET package_description = ?
+          WHERE package_name = ?
+        `,
+        args: ["Fast UI runtime", "react"],
+      })
+      await database.client.batch(
+        [
+          ...createMarkDerivedCatalogDirtyStatements(
+            "failed-sync-test",
+            "2026-01-01T00:00:00.000Z"
+          ),
+          ...createFailDerivedCatalogDirtyStatements(
+            "failed-sync-test",
+            "2026-01-01T00:01:00.000Z"
+          ),
+        ],
+        "write"
+      )
+
+      await ensureCatalogSchema(database.client)
+
+      const searchResult = await searchCatalog(
+        database.client,
+        parseCatalogSearchParams(new URLSearchParams({ q: "runtime" }))
+      )
+      const dirtyMarkers = await readDirtySyncIds(database.client)
+
+      expect(searchResult.items.map((item) => item.packageName)).toEqual([
+        "react",
+      ])
+      expect(dirtyMarkers).toEqual([])
+    } finally {
+      await database.cleanup()
+    }
+  })
+
+  it("keeps active dirty markers while repairing failed dirty markers", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageName: "react",
+        packageDescription: "UI library",
+        packageTags: ["react"],
+      })
+
+      await database.client.execute({
+        sql: `
+          UPDATE packages
+          SET package_description = ?
+          WHERE package_name = ?
+        `,
+        args: ["Fast UI runtime", "react"],
+      })
+      await database.client.batch(
+        [
+          ...createMarkDerivedCatalogDirtyStatements(
+            "active-sync-test",
+            new Date().toISOString()
+          ),
+          ...createMarkDerivedCatalogDirtyStatements(
+            "failed-sync-test",
+            "2026-01-01T00:00:00.000Z"
+          ),
+          ...createFailDerivedCatalogDirtyStatements(
+            "failed-sync-test",
+            "2026-01-01T00:01:00.000Z"
+          ),
+        ],
+        "write"
+      )
+
+      await ensureCatalogSchema(database.client)
+
+      const searchResult = await searchCatalog(
+        database.client,
+        parseCatalogSearchParams(new URLSearchParams({ q: "runtime" }))
+      )
+      const dirtyMarkers = await readDirtySyncIds(database.client)
+
+      expect(searchResult.items.map((item) => item.packageName)).toEqual([
+        "react",
+      ])
+      expect(dirtyMarkers).toEqual(["active-sync-test"])
+    } finally {
+      await database.cleanup()
+    }
+  })
+
+  it("drops malformed dirty marker tables and repairs derived catalog data", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageName: "react",
+        packageDescription: "UI library",
+        packageTags: ["react"],
+      })
+
+      await database.client.execute({
+        sql: `
+          UPDATE packages
+          SET package_description = ?
+          WHERE package_name = ?
+        `,
+        args: ["Fast UI runtime", "react"],
+      })
+      await database.client.execute(`
+        CREATE TABLE catalog_derived_dirty (
+          dirty INTEGER NOT NULL
+        )
+      `)
+      await database.client.execute(`
+        INSERT INTO catalog_derived_dirty (dirty)
+        VALUES (1)
+      `)
+
+      await ensureCatalogSchema(database.client)
+
+      const searchResult = await searchCatalog(
+        database.client,
+        parseCatalogSearchParams(new URLSearchParams({ q: "runtime" }))
+      )
+      const dirtyMarkers = await readDirtySyncIds(database.client)
+
+      expect(searchResult.items.map((item) => item.packageName)).toEqual([
+        "react",
+      ])
+      expect(dirtyMarkers).toEqual([])
+    } finally {
+      await database.cleanup()
+    }
+  })
+
+  it("keeps a failed dirty marker when malformed marker repair rebuild fails", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await seedCatalogPackage(database.client, {
+        packageName: "react",
+        packageDescription: "UI library",
+        packageTags: ["react"],
+      })
+
+      await database.client.execute({
+        sql: `
+          UPDATE packages
+          SET package_description = ?
+          WHERE package_name = ?
+        `,
+        args: ["Fast UI runtime", "react"],
+      })
+      await database.client.execute(`
+        CREATE TABLE catalog_derived_dirty (
+          dirty INTEGER NOT NULL
+        )
+      `)
+      await database.client.execute(`
+        INSERT INTO catalog_derived_dirty (dirty)
+        VALUES (1)
+      `)
+      await database.client.execute("DROP TABLE package_search_fts")
+      await database.client.execute(`
+        CREATE TABLE package_search_fts (
+          invalid_column TEXT
+        )
+      `)
+
+      await expect(ensureCatalogSchema(database.client)).rejects.toThrow(
+        /package_search_fts/
+      )
+
+      const dirtyMarkers = await readDirtySyncIds(database.client)
+
+      expect(dirtyMarkers).toEqual(["schema-repair-malformed-marker"])
+    } finally {
+      await database.cleanup()
+    }
+  })
 })
+
+async function readTagsVersion(
+  client: Parameters<typeof ensureCatalogSchema>[0]
+) {
+  const result = await client.execute({
+    sql: `
+      SELECT meta_value
+      FROM catalog_meta
+      WHERE meta_key = 'tags_version'
+    `,
+  })
+
+  return Number(result.rows[0]?.meta_value ?? 0)
+}
+
+async function readDirtySyncIds(
+  client: Parameters<typeof ensureCatalogSchema>[0]
+) {
+  let result: Awaited<ReturnType<typeof client.execute>>
+
+  try {
+    result = await client.execute(`
+      SELECT sync_id
+      FROM catalog_derived_dirty
+      ORDER BY sync_id ASC
+    `)
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("no such table: catalog_derived_dirty")
+    ) {
+      return []
+    }
+
+    throw error
+  }
+
+  return result.rows.map((row) => String(row.sync_id))
+}

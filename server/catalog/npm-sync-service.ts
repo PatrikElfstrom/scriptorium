@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { readFile } from "node:fs/promises"
 import { createRequire } from "node:module"
@@ -13,13 +14,15 @@ import {
   resolveLatestVersionEntry,
 } from "./npm-registry"
 import {
+  createClearDerivedCatalogDirtyStatements,
+  createFailDerivedCatalogDirtyStatements,
+  createMarkDerivedCatalogDirtyStatements,
   createReplaceTagStatements,
   createPackageUrl,
   createRebuildPackageSearchStatements,
   createRebuildTagStatsStatements,
-  createRefreshPackageSearchStatementsForPackages,
-  createRefreshTagStatsStatements,
   createUpsertPackageStatement,
+  dropDerivedCatalogDirtyTableIfEmpty,
   type CatalogPackageRecord,
 } from "./package-store"
 import {
@@ -29,7 +32,6 @@ import {
   hasUnpublishedRegistryMarker,
   isSecurityHoldingPackage,
 } from "./package-removal"
-import { normalizeTagValue } from "./tag-normalization"
 
 const DEFAULT_DOWNLOADS_PERIOD = "last-month"
 const DEFAULT_GITHUB_BATCH_SIZE = 50
@@ -143,6 +145,7 @@ export async function syncNpmCatalog(
   options: SyncNpmCatalogOptions
 ) {
   const syncedAt = new Date().toISOString()
+  const syncId = randomUUID()
   const githubToken = normalizeOptionalString(options.githubToken)
 
   if (!githubToken) {
@@ -206,118 +209,127 @@ export async function syncNpmCatalog(
   const writeQueue = new PQueue({ concurrency: 1 })
   const writeTasks: Array<Promise<void>> = []
 
-  for (
-    let index = 0;
-    index < packageMetadata.length;
-    index += DEFAULT_WRITE_BATCH_SIZE
-  ) {
-    const batch = packageMetadata.slice(index, index + DEFAULT_WRITE_BATCH_SIZE)
-    writeTasks.push(
-      writeQueue.add(async () => {
-        const batchPackageNames = batch.map((item) => item.packageName)
-        const affectedTagIds = new Set(
-          await loadExistingTagIdsForPackages(client, batchPackageNames)
-        )
-        const statements = batch.flatMap((item) => {
-          const repositoryRef = parseGitHubRepositoryRef(item.repositoryUrl)
-          const enrichmentOutcome = item.isRemoved
-            ? {
-                kind: "replace" as const,
-                repositoryStars: null,
-                repositoryTags: [],
-              }
-            : getRepositoryEnrichmentOutcome(
+  await client.batch(
+    createMarkDerivedCatalogDirtyStatements(syncId, syncedAt),
+    "write"
+  )
+
+  try {
+    for (
+      let index = 0;
+      index < packageMetadata.length;
+      index += DEFAULT_WRITE_BATCH_SIZE
+    ) {
+      const batch = packageMetadata.slice(
+        index,
+        index + DEFAULT_WRITE_BATCH_SIZE
+      )
+      writeTasks.push(
+        writeQueue.add(async () => {
+          const statements = batch.flatMap((item) => {
+            const repositoryRef = parseGitHubRepositoryRef(item.repositoryUrl)
+            const enrichmentOutcome = item.isRemoved
+              ? {
+                  kind: "replace" as const,
+                  repositoryStars: null,
+                  repositoryTags: [],
+                }
+              : getRepositoryEnrichmentOutcome(
+                  item.packageName,
+                  item.repositoryUrl,
+                  repositoryRef,
+                  existingRepositoryUrlsByPackage,
+                  githubMetadataByRepository
+                )
+
+            const packageRecord: CatalogPackageRecord = {
+              packageName: item.packageName,
+              repositoryUrl: item.repositoryUrl,
+              packageUrl: item.packageUrl,
+              packageDescription: item.packageDescription,
+              homepageUrl: item.homepageUrl,
+              repositoryStars:
+                enrichmentOutcome.kind === "replace"
+                  ? enrichmentOutcome.repositoryStars
+                  : null,
+              packageDownloads: item.packageDownloads,
+              packageDownloadsPeriod: item.packageDownloadsPeriod,
+              packageLastPublishedAt: item.packageLastPublishedAt,
+              lastSyncedAt: syncedAt,
+              preserveRepositoryUrlOnNull: item.repositoryUrl == null,
+              preservePackageDescriptionOnNull: item.packageDescription == null,
+              preserveHomepageUrlOnNull: item.homepageUrl == null,
+              preserveRepositoryStarsOnNull:
+                enrichmentOutcome.kind === "preserve",
+            }
+
+            const statements = [
+              createUpsertPackageStatement(packageRecord),
+              ...createReplaceTagStatements(
+                "package_tags",
                 item.packageName,
-                item.repositoryUrl,
-                repositoryRef,
-                existingRepositoryUrlsByPackage,
-                githubMetadataByRepository
+                item.packageTags
+              ),
+            ]
+
+            if (enrichmentOutcome.kind === "replace") {
+              statements.push(
+                ...createReplaceTagStatements(
+                  "repository_tags",
+                  item.packageName,
+                  enrichmentOutcome.repositoryTags
+                )
               )
+            }
 
-          const packageRecord: CatalogPackageRecord = {
-            packageName: item.packageName,
-            repositoryUrl: item.repositoryUrl,
-            packageUrl: item.packageUrl,
-            packageDescription: item.packageDescription,
-            homepageUrl: item.homepageUrl,
-            repositoryStars:
-              enrichmentOutcome.kind === "replace"
-                ? enrichmentOutcome.repositoryStars
-                : null,
-            packageDownloads: item.packageDownloads,
-            packageDownloadsPeriod: item.packageDownloadsPeriod,
-            packageLastPublishedAt: item.packageLastPublishedAt,
-            lastSyncedAt: syncedAt,
-            preserveRepositoryUrlOnNull: item.repositoryUrl == null,
-            preservePackageDescriptionOnNull: item.packageDescription == null,
-            preserveHomepageUrlOnNull: item.homepageUrl == null,
-            preserveRepositoryStarsOnNull:
-              enrichmentOutcome.kind === "preserve",
-          }
-
-          const statements = [
-            createUpsertPackageStatement(packageRecord),
-            ...createReplaceTagStatements(
-              "package_tags",
-              item.packageName,
-              item.packageTags
-            ),
-          ]
-          collectNormalizedTagIds(item.packageTags).forEach((tagId) => {
-            affectedTagIds.add(tagId)
+            return statements
           })
 
-          if (enrichmentOutcome.kind === "replace") {
-            statements.push(
-              ...createReplaceTagStatements(
-                "repository_tags",
-                item.packageName,
-                enrichmentOutcome.repositoryTags
-              )
+          await client.batch(statements, "write")
+          storedCount += batch.length
+
+          const now = Date.now()
+
+          if (
+            now - lastWriteProgressAt >= PROGRESS_INTERVAL_MS ||
+            storedCount === packageMetadata.length
+          ) {
+            options.onProgress?.(
+              `Stored ${storedCount}/${packageMetadata.length} npm packages.`
             )
-            collectNormalizedTagIds(enrichmentOutcome.repositoryTags).forEach(
-              (tagId) => {
-                affectedTagIds.add(tagId)
-              }
-            )
+            lastWriteProgressAt = now
           }
-
-          return statements
         })
-        statements.push(
-          ...createRefreshPackageSearchStatementsForPackages(batchPackageNames)
-        )
+      )
+    }
 
-        await client.batch(statements, "write")
-        await client.batch(
-          createRefreshTagStatsStatements(Array.from(affectedTagIds)),
-          "write"
-        )
-        storedCount += batch.length
+    await Promise.all(writeTasks)
 
-        const now = Date.now()
-
-        if (
-          now - lastWriteProgressAt >= PROGRESS_INTERVAL_MS ||
-          storedCount === packageMetadata.length
-        ) {
-          options.onProgress?.(
-            `Stored ${storedCount}/${packageMetadata.length} npm packages.`
-          )
-          lastWriteProgressAt = now
-        }
-      })
+    options.onProgress?.("Pruning orphaned tags.")
+    await pruneOrphanedTags(client)
+    options.onProgress?.("Rebuilding package search index.")
+    options.onProgress?.("Rebuilding tag stats.")
+    await client.batch(
+      [
+        ...createRebuildPackageSearchStatements(),
+        ...createRebuildTagStatsStatements(),
+        ...createClearDerivedCatalogDirtyStatements(syncId),
+      ],
+      "write"
     )
+    await dropDerivedCatalogDirtyTableIfEmpty(client)
+  } catch (error) {
+    await client
+      .batch(
+        createFailDerivedCatalogDirtyStatements(
+          syncId,
+          new Date().toISOString()
+        ),
+        "write"
+      )
+      .catch(() => undefined)
+    throw error
   }
-
-  await Promise.all(writeTasks)
-
-  options.onProgress?.("Pruning orphaned tags.")
-  await pruneOrphanedTags(client)
-  options.onProgress?.("Rebuilding package search index.")
-  await client.batch(createRebuildPackageSearchStatements(), "write")
-  options.onProgress?.("Rebuilding tag stats.")
-  await client.batch(createRebuildTagStatsStatements(), "write")
 
   options.onProgress?.(`Stored ${packageMetadata.length} npm packages total.`)
 
@@ -512,53 +524,8 @@ async function loadExistingRepositoryUrls(
   return repositoryUrls
 }
 
-async function loadExistingTagIdsForPackages(
-  client: CatalogDatabaseClient,
-  packageNames: string[]
-) {
-  const uniquePackageNames = Array.from(new Set(packageNames))
-
-  if (uniquePackageNames.length === 0) {
-    return [] as string[]
-  }
-
-  const placeholders = uniquePackageNames.map(() => "?").join(", ")
-  const result = await client.execute({
-    sql: `
-      SELECT DISTINCT tag_id
-      FROM (
-        SELECT tag_id
-        FROM package_tags
-        WHERE package_name IN (${placeholders})
-        UNION ALL
-        SELECT tag_id
-        FROM repository_tags
-        WHERE package_name IN (${placeholders})
-      )
-    `,
-    args: [...uniquePackageNames, ...uniquePackageNames],
-  })
-
-  return result.rows.map((row) => String(row.tag_id))
-}
-
 function normalizeStoredUrl(value: unknown) {
   return typeof value === "string" ? value : null
-}
-
-function collectNormalizedTagIds(rawTags: string[]) {
-  return Array.from(
-    new Set(
-      rawTags.flatMap((rawTag) => {
-        const normalizedRawTag = normalizeOptionalString(rawTag)
-        const normalizedTagId = normalizedRawTag
-          ? normalizeTagValue(normalizedRawTag)
-          : undefined
-
-        return normalizedTagId ? [normalizedTagId] : []
-      })
-    )
-  )
 }
 
 function normalizeDownloadCountSelection(

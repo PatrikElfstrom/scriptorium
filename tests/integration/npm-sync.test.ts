@@ -1,5 +1,8 @@
 import { syncNpmCatalog } from "../../server/catalog/admin-service"
+import { createMarkDerivedCatalogDirtyStatements } from "../../server/catalog/package-store"
+import { searchCatalog } from "../../server/catalog/read-service"
 import { ensureCatalogSchema } from "../../server/catalog/schema"
+import { parseCatalogSearchParams } from "../../shared/catalog"
 import { createTestCatalogDatabase } from "../helpers/catalog-test-db"
 
 describe("npm catalog sync", () => {
@@ -1530,6 +1533,201 @@ describe("npm catalog sync", () => {
       await database.cleanup()
     }
   })
+
+  it("rebuilds derived tag stats once after a multi-batch sync", async () => {
+    const database = await createTestCatalogDatabase()
+    const packageEntries = Array.from({ length: 26 }, (_, index) => ({
+      packageName: `package-${index}`,
+      packageDownloads: 1000 - index,
+    }))
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      const packageName = packageEntries.find(
+        (entry) =>
+          url ===
+          `https://registry.npmjs.org/${encodeURIComponent(entry.packageName)}`
+      )?.packageName
+
+      if (packageName) {
+        return createJsonResponse({
+          "dist-tags": { latest: "1.0.0" },
+          time: {
+            "1.0.0": "2026-01-01T00:00:00.000Z",
+          },
+          versions: {
+            "1.0.0": {
+              description: packageName,
+              repository: {
+                url: `https://gitlab.com/example/${packageName}`,
+              },
+              keywords: ["utility"],
+            },
+          },
+        })
+      }
+
+      if (url === "https://api.github.com/graphql") {
+        throw new Error(
+          "GitHub should not be queried for packages without repos."
+        )
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    try {
+      const versionBefore = await readTagsVersion(database.client)
+
+      const result = await syncNpmCatalog(database.client, {
+        githubToken: "test-token",
+        topPackageLimit: 10_000,
+        downloadCountsEntries: packageEntries,
+      })
+
+      const versionAfter = await readTagsVersion(database.client)
+      const tagStats = await database.client.execute({
+        sql: `
+          SELECT package_count
+          FROM tag_stats
+          WHERE tag_id = 'utility'
+        `,
+      })
+
+      expect(result).toEqual({ syncedCount: 26 })
+      expect(versionAfter).toBe(versionBefore + 1)
+      expect(Number(tagStats.rows[0]?.package_count)).toBe(26)
+      await expect(hasDirtyMarkerTable(database.client)).resolves.toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+      await database.cleanup()
+    }
+  })
+
+  it("does not clear dirty markers from overlapping sync runs", async () => {
+    const database = await createTestCatalogDatabase()
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+
+      if (url === "https://registry.npmjs.org/react") {
+        return createJsonResponse({
+          "dist-tags": { latest: "1.0.0" },
+          time: {
+            "1.0.0": "2026-01-01T00:00:00.000Z",
+          },
+          versions: {
+            "1.0.0": {
+              description: "Concurrent sync package",
+              repository: {
+                url: "https://gitlab.com/example/react",
+              },
+              keywords: ["concurrent"],
+            },
+          },
+        })
+      }
+
+      if (url === "https://api.github.com/graphql") {
+        throw new Error("GitHub should not be queried for non-GitHub repos.")
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    try {
+      await database.client.batch(
+        createMarkDerivedCatalogDirtyStatements(
+          "overlapping-sync",
+          "2026-01-01T00:00:00.000Z"
+        ),
+        "write"
+      )
+
+      await syncNpmCatalog(database.client, {
+        githubToken: "test-token",
+        topPackageLimit: 10_000,
+        downloadCountsEntries: [
+          { packageName: "react", packageDownloads: 1000 },
+        ],
+      })
+
+      expect(await readDirtySyncIds(database.client)).toEqual([
+        "overlapping-sync",
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+      await database.cleanup()
+    }
+  })
+
+  it("leaves dirty derived catalog data for schema ensure to repair after sync rebuild failure", async () => {
+    const database = await createTestCatalogDatabase()
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+
+      if (url === "https://registry.npmjs.org/react") {
+        return createJsonResponse({
+          "dist-tags": { latest: "1.0.0" },
+          time: {
+            "1.0.0": "2026-01-01T00:00:00.000Z",
+          },
+          versions: {
+            "1.0.0": {
+              description: "Recoverable sync failure package",
+              repository: {
+                url: "https://gitlab.com/example/react",
+              },
+              keywords: ["recoverable"],
+            },
+          },
+        })
+      }
+
+      if (url === "https://api.github.com/graphql") {
+        throw new Error("GitHub should not be queried for non-GitHub repos.")
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    try {
+      await database.client.execute("DROP TABLE IF EXISTS package_search_fts")
+
+      await expect(
+        syncNpmCatalog(database.client, {
+          githubToken: "test-token",
+          topPackageLimit: 10_000,
+          downloadCountsEntries: [
+            { packageName: "react", packageDownloads: 1000 },
+          ],
+        })
+      ).rejects.toThrow(/package_search_fts/)
+
+      const dirtyMarkersBeforeRepair = await readDirtySyncIds(database.client)
+
+      await ensureCatalogSchema(database.client)
+
+      const searchResult = await searchCatalog(
+        database.client,
+        parseCatalogSearchParams(new URLSearchParams({ q: "recoverable" }))
+      )
+      const dirtyMarkersAfterRepair = await readDirtySyncIds(database.client)
+
+      expect(dirtyMarkersBeforeRepair).toHaveLength(1)
+      expect(searchResult.items.map((item) => item.packageName)).toEqual([
+        "react",
+      ])
+      expect(dirtyMarkersAfterRepair).toEqual([])
+    } finally {
+      vi.unstubAllGlobals()
+      await database.cleanup()
+    }
+  })
 })
 
 function createJsonResponse(payload: unknown, status = 200) {
@@ -1539,4 +1737,52 @@ function createJsonResponse(payload: unknown, status = 200) {
       "Content-Type": "application/json; charset=utf-8",
     },
   })
+}
+
+async function readTagsVersion(client: Parameters<typeof syncNpmCatalog>[0]) {
+  const result = await client.execute({
+    sql: `
+      SELECT meta_value
+      FROM catalog_meta
+      WHERE meta_key = 'tags_version'
+    `,
+  })
+
+  return Number(result.rows[0]?.meta_value ?? 0)
+}
+
+async function readDirtySyncIds(client: Parameters<typeof syncNpmCatalog>[0]) {
+  let result: Awaited<ReturnType<typeof client.execute>>
+
+  try {
+    result = await client.execute(`
+      SELECT sync_id
+      FROM catalog_derived_dirty
+      ORDER BY sync_id ASC
+    `)
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("no such table: catalog_derived_dirty")
+    ) {
+      return []
+    }
+
+    throw error
+  }
+
+  return result.rows.map((row) => String(row.sync_id))
+}
+
+async function hasDirtyMarkerTable(
+  client: Parameters<typeof syncNpmCatalog>[0]
+) {
+  const result = await client.execute(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table'
+      AND name = 'catalog_derived_dirty'
+  `)
+
+  return result.rows.length > 0
 }

@@ -2,9 +2,19 @@ import type { InStatement } from "@libsql/client"
 
 import type { CatalogDatabaseClient } from "./database"
 import {
+  DERIVED_CATALOG_DIRTY_ACTIVE_STATUS,
+  DERIVED_CATALOG_DIRTY_FAILED_STATUS,
+  DERIVED_CATALOG_DIRTY_TABLE,
+  createClearRepairableDerivedCatalogDirtyStatements,
+  createDropDerivedCatalogDirtyTableStatements,
+  createFailDerivedCatalogDirtyStatements,
   createRebuildPackageSearchStatements,
   createRebuildTagStatsStatements,
+  dropDerivedCatalogDirtyTableIfEmpty,
 } from "./package-store"
+
+const STALE_ACTIVE_DERIVED_MARKER_MS = 2 * 60 * 60 * 1000
+const MALFORMED_DERIVED_DIRTY_SYNC_ID = "schema-repair-malformed-marker"
 
 const EXPECTED_TABLE_COLUMNS = {
   packages: [
@@ -26,6 +36,26 @@ const EXPECTED_TABLE_COLUMNS = {
   tag_stats: ["tag_id", "package_count"],
   catalog_meta: ["meta_key", "meta_value"],
 } as const
+
+const DERIVED_TABLE_DEPENDENCIES = [
+  "packages",
+  "package_tags",
+  "repository_tags",
+  "tags",
+] as const
+
+const REBUILDABLE_DERIVED_TABLES = ["package_search_fts", "tag_stats"] as const
+const EXPECTED_DERIVED_CATALOG_DIRTY_COLUMNS = [
+  "sync_id",
+  "marked_at",
+  "status",
+  "updated_at",
+] as const
+
+const CATALOG_TABLE_NAMES = [
+  ...Object.keys(EXPECTED_TABLE_COLUMNS),
+  ...REBUILDABLE_DERIVED_TABLES,
+]
 
 const schemaStatements: InStatement[] = [
   `
@@ -160,6 +190,7 @@ const destructiveResetStatements: InStatement[] = [
   "DROP INDEX IF EXISTS packages_hits_idx",
   "DROP TABLE IF EXISTS repository_tags",
   "DROP TABLE IF EXISTS package_tags",
+  `DROP TABLE IF EXISTS ${DERIVED_CATALOG_DIRTY_TABLE}`,
   "DROP TABLE IF EXISTS package_search_fts",
   "DROP TABLE IF EXISTS tag_aliases",
   "DROP TABLE IF EXISTS tag_stats",
@@ -171,14 +202,72 @@ const destructiveResetStatements: InStatement[] = [
 ]
 
 export async function ensureCatalogSchema(client: CatalogDatabaseClient) {
-  if (await hasLegacyCatalogSchema(client)) {
+  const snapshot = await getCatalogSchemaSnapshot(client)
+  const hasLegacySchema = hasLegacyCatalogSchema(snapshot)
+  const hasMalformedDerivedDirtyTable =
+    !hasLegacySchema && hasMalformedDerivedCatalogDirtyTable(snapshot)
+  const missingTables = hasLegacySchema
+    ? new Set<string>()
+    : getMissingCatalogTables(snapshot)
+  const staleActiveMarkedBefore = createStaleActiveDerivedMarkerCutoff()
+  const dirtyState =
+    !hasLegacySchema &&
+    !hasMalformedDerivedDirtyTable &&
+    snapshot.existingTables.has(DERIVED_CATALOG_DIRTY_TABLE)
+      ? await getDerivedCatalogDirtyState(client, staleActiveMarkedBefore)
+      : { hasAnyRows: false, hasRepairableRows: false }
+  const hasRepairableDirtyRows = dirtyState.hasRepairableRows
+  const hasDirtyDerivedCatalogData =
+    hasMalformedDerivedDirtyTable || hasRepairableDirtyRows
+
+  if (hasLegacySchema) {
     await applyStatements(client, destructiveResetStatements)
+  }
+
+  if (hasMalformedDerivedDirtyTable) {
+    await applyStatements(client, [
+      ...createDropDerivedCatalogDirtyTableStatements(),
+      ...createFailDerivedCatalogDirtyStatements(
+        MALFORMED_DERIVED_DIRTY_SYNC_ID,
+        new Date().toISOString()
+      ),
+    ])
   }
 
   await applyStatements(client, obsoleteIndexDropStatements)
   await applyStatements(client, schemaStatements)
-  await applyStatements(client, createRebuildPackageSearchStatements())
-  await applyStatements(client, createRebuildTagStatsStatements())
+
+  if (
+    hasLegacySchema ||
+    hasDirtyDerivedCatalogData ||
+    shouldRebuildDerivedTable(missingTables, "package_search_fts")
+  ) {
+    await applyStatements(client, createRebuildPackageSearchStatements())
+  }
+
+  if (
+    hasLegacySchema ||
+    hasDirtyDerivedCatalogData ||
+    shouldRebuildDerivedTable(missingTables, "tag_stats")
+  ) {
+    await applyStatements(client, createRebuildTagStatsStatements())
+  }
+
+  if (hasDirtyDerivedCatalogData) {
+    await applyStatements(
+      client,
+      createClearRepairableDerivedCatalogDirtyStatements(
+        staleActiveMarkedBefore
+      )
+    )
+  }
+
+  if (
+    snapshot.existingTables.has(DERIVED_CATALOG_DIRTY_TABLE) &&
+    (hasDirtyDerivedCatalogData || !dirtyState.hasAnyRows)
+  ) {
+    await dropDerivedCatalogDirtyTableIfEmpty(client)
+  }
 }
 
 export async function resetCatalogSchema(client: CatalogDatabaseClient) {
@@ -199,18 +288,55 @@ async function applyStatements(
   await client.batch(statements, "write")
 }
 
-async function hasLegacyCatalogSchema(client: CatalogDatabaseClient) {
-  const tables = await Promise.all(
-    Object.entries(EXPECTED_TABLE_COLUMNS).map(
-      async ([tableName, expectedColumns]) => ({
-        currentColumns: await getTableColumns(client, tableName),
-        expectedColumns,
-      })
-    )
-  )
+type CatalogSchemaSnapshot = {
+  columnsByTable: Map<string, string[]>
+  existingTables: Set<string>
+}
 
-  for (const { currentColumns, expectedColumns } of tables) {
-    if (currentColumns === null) {
+async function getCatalogSchemaSnapshot(client: CatalogDatabaseClient) {
+  const tableNames = [...CATALOG_TABLE_NAMES, DERIVED_CATALOG_DIRTY_TABLE]
+  const placeholders = tableNames.map(() => "?").join(", ")
+  const result = await client.execute({
+    sql: `
+      SELECT
+        m.name AS table_name,
+        p.name AS column_name
+      FROM sqlite_master m
+      LEFT JOIN pragma_table_info(m.name) p
+      WHERE m.type = 'table'
+        AND m.name IN (${placeholders})
+      ORDER BY m.name ASC, p.cid ASC
+    `,
+    args: tableNames,
+  })
+  const snapshot: CatalogSchemaSnapshot = {
+    columnsByTable: new Map(),
+    existingTables: new Set(),
+  }
+
+  for (const row of result.rows) {
+    const tableName = String(row.table_name)
+    snapshot.existingTables.add(tableName)
+
+    if (row.column_name === null) {
+      continue
+    }
+
+    const columns = snapshot.columnsByTable.get(tableName) ?? []
+    columns.push(String(row.column_name))
+    snapshot.columnsByTable.set(tableName, columns)
+  }
+
+  return snapshot
+}
+
+function hasLegacyCatalogSchema(snapshot: CatalogSchemaSnapshot) {
+  for (const [tableName, expectedColumns] of Object.entries(
+    EXPECTED_TABLE_COLUMNS
+  )) {
+    const currentColumns = snapshot.columnsByTable.get(tableName)
+
+    if (!currentColumns) {
       continue
     }
 
@@ -227,19 +353,77 @@ async function hasLegacyCatalogSchema(client: CatalogDatabaseClient) {
   return false
 }
 
-async function getTableColumns(
-  client: CatalogDatabaseClient,
-  tableName: string
-) {
-  const result = await client.execute({
-    sql: `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
-    args: [tableName],
-  })
+function hasMalformedDerivedCatalogDirtyTable(snapshot: CatalogSchemaSnapshot) {
+  const currentColumns = snapshot.columnsByTable.get(
+    DERIVED_CATALOG_DIRTY_TABLE
+  )
 
-  if (result.rows.length === 0) {
-    return null
+  if (!currentColumns) {
+    return false
   }
 
-  const columns = await client.execute(`PRAGMA table_info(${tableName})`)
-  return columns.rows.map((row) => String(row.name))
+  const currentColumnSet = new Set(currentColumns)
+
+  return (
+    currentColumns.length !== EXPECTED_DERIVED_CATALOG_DIRTY_COLUMNS.length ||
+    EXPECTED_DERIVED_CATALOG_DIRTY_COLUMNS.some(
+      (column) => !currentColumnSet.has(column)
+    )
+  )
+}
+
+function getMissingCatalogTables(snapshot: CatalogSchemaSnapshot) {
+  return new Set(
+    CATALOG_TABLE_NAMES.filter(
+      (tableName) => !snapshot.existingTables.has(tableName)
+    )
+  )
+}
+
+function shouldRebuildDerivedTable(
+  missingTables: Set<string>,
+  derivedTable: (typeof REBUILDABLE_DERIVED_TABLES)[number]
+) {
+  return (
+    missingTables.has(derivedTable) ||
+    DERIVED_TABLE_DEPENDENCIES.some((tableName) => missingTables.has(tableName))
+  )
+}
+
+async function getDerivedCatalogDirtyState(
+  client: CatalogDatabaseClient,
+  staleActiveMarkedBefore: string
+) {
+  const result = await client.execute({
+    sql: `
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM ${DERIVED_CATALOG_DIRTY_TABLE}
+        ) AS has_any_rows,
+        EXISTS (
+          SELECT 1
+          FROM ${DERIVED_CATALOG_DIRTY_TABLE}
+          WHERE status = ?
+            OR (
+              status = ?
+              AND marked_at <= ?
+            )
+        ) AS has_repairable_rows
+    `,
+    args: [
+      DERIVED_CATALOG_DIRTY_FAILED_STATUS,
+      DERIVED_CATALOG_DIRTY_ACTIVE_STATUS,
+      staleActiveMarkedBefore,
+    ],
+  })
+
+  return {
+    hasAnyRows: Number(result.rows[0]?.has_any_rows ?? 0) === 1,
+    hasRepairableRows: Number(result.rows[0]?.has_repairable_rows ?? 0) === 1,
+  }
+}
+
+function createStaleActiveDerivedMarkerCutoff() {
+  return new Date(Date.now() - STALE_ACTIVE_DERIVED_MARKER_MS).toISOString()
 }
