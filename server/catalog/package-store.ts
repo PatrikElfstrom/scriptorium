@@ -392,11 +392,23 @@ export async function dropDerivedCatalogDirtyTableIfEmpty(
 
     await transaction.commit()
   } catch (error) {
-    await transaction.rollback()
+    await transaction.rollback().catch(() => undefined)
+
+    if (isMissingDerivedCatalogDirtyTableError(error)) {
+      return
+    }
+
     throw error
   } finally {
     transaction.close()
   }
+}
+
+function isMissingDerivedCatalogDirtyTableError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes(`no such table: ${DERIVED_CATALOG_DIRTY_TABLE}`)
+  )
 }
 
 export function createRefreshTagStatsStatements(

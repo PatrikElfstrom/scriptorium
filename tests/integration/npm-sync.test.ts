@@ -1,5 +1,8 @@
 import { syncNpmCatalog } from "../../server/catalog/admin-service"
-import { createMarkDerivedCatalogDirtyStatements } from "../../server/catalog/package-store"
+import {
+  createMarkDerivedCatalogDirtyStatements,
+  dropDerivedCatalogDirtyTableIfEmpty,
+} from "../../server/catalog/package-store"
 import { searchCatalog } from "../../server/catalog/read-service"
 import { ensureCatalogSchema } from "../../server/catalog/schema"
 import { parseCatalogSearchParams } from "../../shared/catalog"
@@ -912,6 +915,136 @@ describe("npm catalog sync", () => {
     }
   })
 
+  it("continues syncing when GitHub repository enrichment is temporarily unavailable", async () => {
+    const database = await createTestCatalogDatabase()
+    let syncRound = 0
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+
+      if (url === "https://registry.npmjs.org/react") {
+        syncRound += 1
+
+        if (syncRound === 1) {
+          return createJsonResponse({
+            "dist-tags": { latest: "19.0.0" },
+            time: {
+              "19.0.0": "2026-01-01T00:00:00.000Z",
+            },
+            versions: {
+              "19.0.0": {
+                description: "UI library",
+                homepage: "https://react.dev",
+                repository: {
+                  url: "git+https://github.com/facebook/react.git",
+                },
+                keywords: ["react", "ui"],
+              },
+            },
+          })
+        }
+
+        return createJsonResponse({
+          "dist-tags": { latest: "19.0.1" },
+          time: {
+            "19.0.1": "2026-01-02T00:00:00.000Z",
+          },
+          versions: {
+            "19.0.1": {
+              description: "UI library updated",
+              homepage: "https://react.dev/reference/react",
+              repository: {
+                url: "https://github.com/facebook/react",
+              },
+              keywords: ["react", "compiler"],
+            },
+          },
+        })
+      }
+
+      if (url === "https://api.github.com/graphql") {
+        if (syncRound === 1) {
+          return createJsonResponse({
+            data: {
+              repo_0: {
+                stargazerCount: 200_000,
+                repositoryTopics: {
+                  nodes: [{ topic: { name: "frontend" } }],
+                },
+              },
+            },
+          })
+        }
+
+        return new Response(
+          JSON.stringify({
+            message: "Service unavailable.",
+          }),
+          {
+            status: 503,
+            statusText: "Service Unavailable",
+            headers: {
+              "Content-Type": "application/json; charset=utf-8",
+            },
+          }
+        )
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    try {
+      const firstResult = await syncNpmCatalog(database.client, {
+        githubToken: "test-token",
+        topPackageLimit: 10_000,
+        downloadCountsEntries: [
+          { packageName: "react", packageDownloads: 1000 },
+        ],
+      })
+      const secondResult = await syncNpmCatalog(database.client, {
+        githubToken: "test-token",
+        topPackageLimit: 10_000,
+        downloadCountsEntries: [
+          { packageName: "react", packageDownloads: 1100 },
+        ],
+      })
+
+      const packageRows = await database.client.execute({
+        sql: `
+          SELECT
+            repository_stars,
+            package_downloads
+          FROM packages
+          WHERE package_name = ?
+        `,
+        args: ["react"],
+      })
+      const repositoryTags = await database.client.execute({
+        sql: `
+          SELECT tag_id
+          FROM repository_tags
+          WHERE package_name = ?
+          ORDER BY tag_id ASC
+        `,
+        args: ["react"],
+      })
+
+      expect(firstResult).toEqual({ syncedCount: 1 })
+      expect(secondResult).toEqual({ syncedCount: 1 })
+      expect(packageRows.rows[0]).toMatchObject({
+        repository_stars: 200_000,
+        package_downloads: 1100,
+      })
+      expect(repositoryTags.rows.map((row) => row.tag_id)).toEqual([
+        "front-end",
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+      await database.cleanup()
+    }
+  })
+
   it("clears stale GitHub metadata when repository enrichment is forbidden after a repo change", async () => {
     const database = await createTestCatalogDatabase()
     let syncRound = 0
@@ -1659,6 +1792,18 @@ describe("npm catalog sync", () => {
       ])
     } finally {
       vi.unstubAllGlobals()
+      await database.cleanup()
+    }
+  })
+
+  it("tolerates dirty marker cleanup after another sync drops the marker table", async () => {
+    const database = await createTestCatalogDatabase()
+
+    try {
+      await expect(
+        dropDerivedCatalogDirtyTableIfEmpty(database.client)
+      ).resolves.toBeUndefined()
+    } finally {
       await database.cleanup()
     }
   })

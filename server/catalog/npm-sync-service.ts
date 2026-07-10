@@ -126,6 +126,22 @@ class GitHubMetadataFetchError extends Error {
   }
 }
 
+class RetryableHttpError extends Error {
+  status: number
+  url: string
+
+  constructor(status: number, url: string) {
+    super(`Retryable HTTP ${status} for ${url}`)
+    this.name = "RetryableHttpError"
+    this.status = status
+    this.url = url
+  }
+}
+
+type RecoverableGitHubMetadataError =
+  | GitHubMetadataFetchError
+  | RetryableHttpError
+
 type SyncNpmCatalogOptions = {
   githubToken: string
   onProgress?: (message: string) => void
@@ -969,8 +985,12 @@ function hasGitHubRepositoryData(data?: GitHubRepositoryBatchResponse) {
 
 function isRecoverableGitHubMetadataError(
   error: unknown
-): error is GitHubMetadataFetchError {
-  return error instanceof GitHubMetadataFetchError && error.status === 403
+): error is RecoverableGitHubMetadataError {
+  if (error instanceof GitHubMetadataFetchError) {
+    return error.status === 403
+  }
+
+  return error instanceof RetryableHttpError
 }
 
 function createGitHubRepositoryMetadataQuery(
@@ -1022,7 +1042,7 @@ async function retryableFetch(url: string, init?: RequestInit) {
       }
 
       if (RETRYABLE_STATUS_CODES.has(response.status)) {
-        throw new Error(`Retryable HTTP ${response.status} for ${url}`)
+        throw new RetryableHttpError(response.status, url)
       }
 
       return response
